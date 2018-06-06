@@ -48,3 +48,6 @@ class MidiFixtureControl(Plugin):
 
     def get_library(self):
         return self.library_reference
+
+    def get_config(self):
+        return self.Config
