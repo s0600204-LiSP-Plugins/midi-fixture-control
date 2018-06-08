@@ -20,6 +20,7 @@
 from PyQt5.QtCore import Qt, QT_TRANSLATE_NOOP
 from PyQt5.QtWidgets import QVBoxLayout, QFormLayout, QFrame, QLabel, QComboBox, QSpinBox, QLineEdit
 
+from lisp.core.has_properties import Property
 from lisp.cues.cue import Cue
 from lisp.plugins import get_plugin
 from lisp.ui.settings.cue_settings import CueSettingsRegistry
@@ -28,6 +29,8 @@ from lisp.ui.ui_utils import translate
 
 class FixtureCommandCue(Cue):
     Name = QT_TRANSLATE_NOOP('CueName', 'Fixture Command Cue')
+
+    fixture_command = Property()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -154,10 +157,39 @@ class FixtureCommandCueSettings(SettingsPage):
                 logging.debug("Need a function for dealing with an input depending on a {}".format(type(arg_widget)))
 
     def getSettings(self):
-        return {}
+        conf = {
+            "command": self.commandCombo.currentData(),
+            "args": {}
+        }
+        current_command_data = self._get_current_command_data()
+
+        for arg_name, arg_definition in current_command_data.items():
+            conf["args"][arg_name] = self._get_value_from_argument_widget(arg_name)
+
+        return {'fixture_command': conf}
 
     def loadSettings(self, settings):
-        pass
+        conf = settings.get('fixture_command', {})
+
+        # Set to a number > 0 first, so setting to 0 actually does something
+        self.commandCombo.setCurrentIndex(self.commandCombo.count() - 1)
+        self.commandCombo.setCurrentIndex(self.commandCombo.findData(conf['command']) if conf else 0)
+
+        if not conf:
+            return
+
+        for arg_name, arg_value in conf['args'].items():
+            if arg_name in self.argument_sources:
+                arg_widget = self.argument_sources[arg_name]
+                if isinstance(arg_widget, QSpinBox):
+                    arg_widget.setValue(arg_value)
+
+                elif isinstance(arg_widget, QComboBox):
+                    idx = arg_widget.findData(arg_value)
+                    arg_widget.setCurrentIndex(idx if idx > -1 else 0)
+
+                elif isinstance(arg_widget, QLineEdit):
+                    arg_widget.setText(arg_value)
 
     def _get_value_from_argument_widget(self, widget_name):
         arg_widget = self.argument_sources[widget_name]

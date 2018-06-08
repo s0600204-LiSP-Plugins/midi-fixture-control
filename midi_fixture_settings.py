@@ -83,13 +83,13 @@ class MidiFixtureSettings(ConfigurationPage):
             self.midiChannelSpin.setRange(1, 17 - fixture['width'])
 
     def applySettings(self):
-        self.config['midi_channel'] = self.midiChannelSpin.value()
+        self.config['midi_channel'] = self.midiChannelSpin.value() - 1
         if self.selectedFixtureID:
             self.config['fixture_id'] = self.selectedFixtureID
         self.config.write()
 
     def loadConfiguration(self):
-        self.midiChannelSpin.setValue(self.config['midi_channel'])
+        self.midiChannelSpin.setValue(self.config['midi_channel'] + 1)
         if self.config['fixture_id']:
             self.selectedFixtureID = self.config['fixture_id'] # todo: validate
             self._refresh_fixture()
