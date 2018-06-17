@@ -35,8 +35,22 @@ class FixtureCommandCue(Cue):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.name = translate('CueName', self.Name)
+        self._midi_out = get_plugin('Midi').output
 
     def __start__(self, fade=False):
+        if not self.fixture_command:
+            return False
+
+        plugin_config = get_plugin('MidiFixtureControl').get_config()
+        library = get_plugin('MidiFixtureControl').get_library()
+        midi_messages = library.build_device_command(plugin_config['fixture_id'],
+                                                     int(plugin_config['midi_channel']),
+                                                     self.fixture_command['command'],
+                                                     self.fixture_command['args'])
+
+        for dict_message in midi_messages:
+            self._midi_out.send_from_dict(dict_message)
+
         return False
 
 class FixtureCommandCueSettings(SettingsPage):
