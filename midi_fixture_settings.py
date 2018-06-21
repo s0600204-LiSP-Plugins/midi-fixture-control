@@ -17,16 +17,21 @@
 # You should have received a copy of the GNU General Public License
 # along with Linux Show Player.  If not, see <http://www.gnu.org/licenses/>.
 
+# pylint: disable=no-name-in-module
 from PyQt5.QtCore import Qt#, QT_TRANSLATE_NOOP
-from PyQt5.QtWidgets import QVBoxLayout, QFormLayout, QGroupBox, QLabel, QSpinBox, QPushButton
+from PyQt5.QtWidgets import QGridLayout, QGroupBox, QHeaderView, QPushButton, \
+    QTableView, QTableWidget, QVBoxLayout
 
 from lisp.plugins import get_plugin
 from lisp.plugins.midi_fixture_control.midi_fixture_select import FixtureSelectDialog
+from lisp.plugins.midi_fixture_control.ui import LabelDelegate
+from lisp.ui.qdelegates import CheckBoxDelegate, SpinBoxDelegate
+from lisp.ui.qmodels import SimpleTableModel
 from lisp.ui.settings.pages import SettingsPage
 from lisp.ui.ui_utils import translate
 
 class MidiFixtureSettings(SettingsPage):
-    Name = "MIDI Fixture Control"
+    Name = "MIDI Fixture Patch"
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -34,62 +39,92 @@ class MidiFixtureSettings(SettingsPage):
         self.layout().setAlignment(Qt.AlignTop)
 
         self.fixtureSelectDialog = FixtureSelectDialog(parent=self)
-        self.selectedFixtureID = ''
 
-        self.fixtureGroup = QGroupBox(self)
-        self.fixtureGroup.setTitle("Selected Fixture")
-        self.fixtureGroup.setLayout(QVBoxLayout())
-        self.layout().addWidget(self.fixtureGroup)
+        self.patchGroup = QGroupBox(self)
+        self.patchGroup.setTitle("MIDI Fixture Patch")
+        self.patchGroup.setLayout(QGridLayout())
+        self.layout().addWidget(self.patchGroup)
 
-        self.fixtureManuLabel = QLabel(self.fixtureGroup)
-        self.fixtureManuLabel.setAlignment(Qt.AlignCenter)
-        self.fixtureManuLabel.setStyleSheet('font-weight: bold;')
-        self.fixtureManuLabel.setText('-')
-        self.fixtureGroup.layout().addWidget(self.fixtureManuLabel)
+        self.patchListView = MidiPatchView()
+        self.patchListModel = SimpleTableModel([
+            translate('MidiFixtureSettings', 'MIDI #'),
+            translate('MidiFixtureSettings', 'To'),
+            translate('MidiFixtureSettings', 'Manufacturer & Model'),
+            translate('MidiFixtureSettings', 'Default')
+        ])
+        self.patchListView.setModel(self.patchListModel)
+        self.patchGroup.layout().addWidget(self.patchListView, 0, 0, 1, 3)
 
-        self.fixtureModelLabel = QLabel(self.fixtureGroup)
-        self.fixtureModelLabel.setAlignment(Qt.AlignCenter)
-        self.fixtureModelLabel.setStyleSheet('font-weight: bold;')
-        self.fixtureModelLabel.setText('-')
-        self.fixtureGroup.layout().addWidget(self.fixtureModelLabel)
+        self.addToPatchButton = QPushButton(self.patchGroup)
+        self.addToPatchButton.setText('Add')
+        self.patchGroup.layout().addWidget(self.addToPatchButton, 1, 0)
 
-        self.fixtureSelectButton = QPushButton(self)
-        self.fixtureSelectButton.setText(translate('MidiFixtureSettings', 'Change Selected Fixture')),
-        self.fixtureSelectButton.clicked.connect(self.select_fixture)
-        self.fixtureGroup.layout().addWidget(self.fixtureSelectButton)
+        self.editPatchButton = QPushButton(self.patchGroup)
+        self.editPatchButton.setText('Edit')
+        self.patchGroup.layout().addWidget(self.editPatchButton, 1, 1)
 
-        self.midiChannelLayout = QFormLayout(self.fixtureGroup)
-        self.fixtureGroup.layout().addLayout(self.midiChannelLayout)
-
-        self.midiChannelSpin = QSpinBox(self)
-        self.midiChannelSpin.setRange(1, 16)
-        self.midiChannelLayout.addRow(translate('MidiFixtureSettings', 'MIDI Channel'), self.midiChannelSpin)
+        self.removeFromPatchButton = QPushButton(self.patchGroup)
+        self.removeFromPatchButton.setText('Remove')
+        self.patchGroup.layout().addWidget(self.removeFromPatchButton, 1, 2)
 
     def select_fixture(self):
         if self.fixtureSelectDialog.exec_() == self.fixtureSelectDialog.Accepted:
             selected = self.fixtureSelectDialog.selected_fixture()
             if not selected:
                 return
-            self.selectedFixtureID = selected
-            self._refresh_fixture()
-
-    def _refresh_fixture(self):
-            library = get_plugin('MidiFixtureControl').get_library()
-            fixture = library.get_device_profile(self.selectedFixtureID)
-            self.fixtureManuLabel.setText(library.get_manufacturer_list()[fixture['manufacturer']])
-            self.fixtureModelLabel.setText(fixture['name'])
-            self.midiChannelSpin.setRange(1, 17 - fixture['width'])
+            print(selected)
 
     def getSettings(self):
-        conf = {
-            'midi_channel':self.midiChannelSpin.value() - 1
-        }
-        if self.selectedFixtureID:
-            conf['fixture_id'] = self.selectedFixtureID
-        return conf
+        pass
 
-    def loadSettings(self, settings):
-        self.midiChannelSpin.setValue(settings['midi_channel'] + 1)
-        if settings['fixture_id']:
-            self.selectedFixtureID = settings['fixture_id'] # todo: validate
-            self._refresh_fixture()
+    def loadSettings(self):
+        pass
+
+class MidiPatchView(QTableView):
+    '''Midi patch view.'''
+
+    columns = [
+        {
+            'delegate': SpinBoxDelegate(minimum=1, maximum=16),
+            'width': 64
+        }, {
+            'delegate': LabelDelegate(),
+            'width': 32
+        }, {
+            'delegate': LabelDelegate()
+        }, {
+            'delegate': CheckBoxDelegate(),
+            'width': 64
+        }
+    ]
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        self.setSelectionBehavior(QTableWidget.SelectRows)
+        self.setSelectionMode(QTableView.SingleSelection)
+
+        self.setShowGrid(False)
+        self.setAlternatingRowColors(True)
+
+        self.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        self.horizontalHeader().setStretchLastSection(False)
+        self.horizontalHeader().setHighlightSections(False)
+
+        self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
+        self.verticalHeader().setDefaultSectionSize(24)
+        self.verticalHeader().setHighlightSections(False)
+
+        for col_idx, col_spec in enumerate(self.columns):
+            self.setItemDelegateForColumn(col_idx, col_spec['delegate'])
+
+    def setModel(self, model):
+        super().setModel(model)
+
+        # Widths and resize modes specific to particular columns can only be set
+        # *after* a model is applied.
+        for col_idx, col_spec in enumerate(self.columns):
+            if 'width' in col_spec:
+                self.horizontalHeader().resizeSection(col_idx, col_spec['width'])
+            else:
+                self.horizontalHeader().setSectionResizeMode(col_idx, QHeaderView.Stretch)
