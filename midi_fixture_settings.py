@@ -20,20 +20,35 @@
 from copy import copy
 
 # pylint: disable=no-name-in-module
-from PyQt5.QtCore import Qt#, QT_TRANSLATE_NOOP
-from PyQt5.QtWidgets import QGridLayout, QGroupBox, QHeaderView, QPushButton, \
-    QTableView, QTableWidget, QVBoxLayout
+from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex
+from PyQt5.QtWidgets import QGridLayout, QGroupBox, QPushButton, QVBoxLayout
 
 from lisp.plugins import get_plugin
 from lisp.plugins.midi_fixture_control.midi_fixture_select import FixtureSelectDialog
 from lisp.plugins.midi_fixture_control.ui import LabelDelegate
-from lisp.ui.qdelegates import CheckBoxDelegate, SpinBoxDelegate
-from lisp.ui.qmodels import SimpleTableModel
+from lisp.ui.qdelegates import RadioButtonDelegate, SpinBoxDelegate
+from lisp.ui.qviews import SimpleTableView
 from lisp.ui.settings.pages import SettingsPage
 from lisp.ui.ui_utils import translate
 
 class MidiFixtureSettings(SettingsPage):
     Name = "MIDI Fixture Patch"
+
+    TABLE_COLUMNS = [
+        None,
+        {
+            'delegate': SpinBoxDelegate(minimum=1, maximum=16),
+            'width': 72
+        }, {
+            'delegate': LabelDelegate(),
+            'width': 28
+        }, {
+            'delegate': LabelDelegate()
+        }, {
+            'delegate': RadioButtonDelegate(),
+            'width': 64
+        }
+    ]
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -47,14 +62,8 @@ class MidiFixtureSettings(SettingsPage):
         self.patchGroup.setLayout(QGridLayout())
         self.layout().addWidget(self.patchGroup)
 
-        self.patchListView = MidiPatchView()
-        self.patchListModel = MidiPatchModel([
-            translate('MidiFixtureSettings', 'MIDI #'),
-            translate('MidiFixtureSettings', 'To'),
-            translate('MidiFixtureSettings', 'Manufacturer & Model'),
-            translate('MidiFixtureSettings', 'Default')
-        ])
-        self.patchListView.setModel(self.patchListModel)
+        self.patchListModel = MidiPatchModel()
+        self.patchListView = SimpleTableView(self.patchListModel, self.TABLE_COLUMNS)
         self.patchGroup.layout().addWidget(self.patchListView, 0, 0, 1, 3)
 
         self.addToPatchButton = QPushButton(self.patchGroup)
@@ -74,16 +83,7 @@ class MidiFixtureSettings(SettingsPage):
         fixture_id = self.select_fixture()
         if not fixture_id:
             return
-
-        library = get_plugin('MidiFixtureControl').get_library()
-        fixture_profile = library.get_device_profile(fixture_id)
-
-        fixture_label = '{manu} {model}'.format_map({
-            'manu': library.get_manufacturer_list()[fixture_profile['manufacturer']],
-            'model': fixture_profile['name']
-        })
-
-        self.patchListModel.appendPatch(fixture_label, fixture_profile['width'], fixture_id)
+        self.patchListModel.appendPatch(fixture_id)
 
     def select_fixture(self):
         if self.fixtureSelectDialog.exec_() == self.fixtureSelectDialog.Accepted:
@@ -98,87 +98,100 @@ class MidiFixtureSettings(SettingsPage):
     def loadSettings(self):
         pass
 
-class MidiPatchView(QTableView):
-    '''Midi patch view.'''
+class MidiPatchModel(QAbstractTableModel):
+    '''MIDI Patch Model'''
 
-    columns = [
-        {
-            'delegate': SpinBoxDelegate(minimum=1, maximum=16),
-            'width': 72
-        }, {
-            'delegate': LabelDelegate(),
-            'width': 28
-        }, {
-            'delegate': LabelDelegate()
-        }, {
-            'delegate': CheckBoxDelegate(),
-            'width': 64
-        }
-    ]
+    def __init__(self):
+        super().__init__()
+        self.address_space = MidiAddressSpace()
+        self.rows = []
+        self.columns = [
+            {
+                'label': 'Fixture ID',
+                'flags': Qt.NoItemFlags
+            }, {
+                'label': translate('MidiFixtureSettings', 'MIDI #'),
+                'flags': Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable
+            }, {
+                'label': translate('MidiFixtureSettings', 'To'),
+                'flags': Qt.ItemIsEnabled | Qt.ItemIsSelectable
+            }, {
+                'label': translate('MidiFixtureSettings', 'Manufacturer & Model'),
+                'flags': Qt.ItemIsEnabled | Qt.ItemIsSelectable
+            }, {
+                'label': translate('MidiFixtureSettings', 'Default'),
+                'flags': Qt.ItemIsEditable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable
+            }
+        ]
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def rowCount(self, parent=None):
+        # pylint: disable=invalid-name, missing-docstring, unused-argument
+        return len(self.rows)
 
-        self.setSelectionBehavior(QTableWidget.SelectRows)
-        self.setSelectionMode(QTableView.SingleSelection)
+    def columnCount(self, parent=None):
+        # pylint: disable=invalid-name, missing-docstring, unused-argument
+        return len(self.columns)
 
-        self.setShowGrid(False)
-        self.setAlternatingRowColors(True)
+    def headerData(self, section, orientation, role=Qt.DisplayRole):
+        # pylint: disable=invalid-name, missing-docstring
+        if role == Qt.DisplayRole and orientation == Qt.Horizontal:
+            return self.columns[section]['label']
 
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.horizontalHeader().setStretchLastSection(False)
-        self.horizontalHeader().setHighlightSections(False)
+        if role == Qt.SizeHintRole and orientation == Qt.Vertical:
+            return 0
 
-        self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.verticalHeader().setDefaultSectionSize(24)
-        self.verticalHeader().setHighlightSections(False)
-
-        for col_idx, col_spec in enumerate(self.columns):
-            self.setItemDelegateForColumn(col_idx, col_spec['delegate'])
-
-    def setModel(self, model):
-        super().setModel(model)
-
-        # Widths and resize modes specific to particular columns can only be set
-        # *after* a model is applied.
-        for col_idx, col_spec in enumerate(self.columns):
-            if 'width' in col_spec:
-                self.horizontalHeader().resizeSection(col_idx, col_spec['width'])
-            else:
-                self.horizontalHeader().setSectionResizeMode(col_idx, QHeaderView.Stretch)
-
-class MidiPatchModel(SimpleTableModel):
-    def __init__(self, columns):
-        super().__init__(columns)
-        self.address_space = [False for i in range(16)]
-        self.fixture_patch = [None for i in range(16)]
-        print("AS : " + str(self.address_space))
-
-    def appendPatch(self, fixture_label, fixture_width, fixture_id):
-        fixture_address = self._find_space(0, fixture_width, False)
-        if fixture_address == -1:
-            return
-        fixture_end_address = fixture_address + fixture_width
-
-        self.fixture_patch[fixture_address] = fixture_id
-        for idx in range(fixture_address, fixture_end_address):
-            self.address_space[idx] = True
-
-        super().appendRow(fixture_address + 1, fixture_end_address, fixture_label, self.rowCount() == 0)
-
-    def removeRow(self, row):
-        print("AS : " + str(self.address_space))
-        super().removeRow(row)
+    def data(self, index, role=Qt.DisplayRole):
+        if index.isValid():
+            if role == Qt.DisplayRole or role == Qt.EditRole:
+                return self.rows[index.row()][index.column()]
+            elif role == Qt.TextAlignmentRole:
+                return Qt.AlignCenter
+            elif role == Qt.CheckStateRole:
+                if self.flags(index) & Qt.ItemIsUserCheckable:
+                    return Qt.Checked if index.data(Qt.EditRole) else Qt.Unchecked
+        return None
 
     def setData(self, index, value, role=Qt.DisplayRole):
-        if not index.isValid():
-            return False
+        # pylint: disable=invalid-name, missing-docstring
+        if index.isValid():
+            if role == Qt.DisplayRole or role == Qt.EditRole:
+                self.rows[index.row()][index.column()] = value
+                self.dataChanged.emit(self.index(index.row(), 0),
+                                      self.index(index.row(), index.column()),
+                                      [Qt.DisplayRole, Qt.EditRole])
+                return True
 
-        if index.column() == 0:
-            print(value)
+            if role == Qt.CheckStateRole:
+                self.rows[index.row()][index.column()] = True if value is Qt.Checked else False
+                self.dataChanged.emit(self.index(index.row(), 0),
+                                      self.index(index.row(), index.column()),
+                                      [Qt.CheckStateRole])
+                return True
 
-        print("AS : " + str(self.address_space))
-        return super().setData(index, value, role)
+        return False
+
+    def appendPatch(self, fixture_id):
+        library = get_plugin('MidiFixtureControl').get_library()
+        fixture_profile = library.get_device_profile(fixture_id)
+
+        fixture_width = fixture_profile['width']
+        fixture_address = self.address_space.find_block(1, fixture_width, loop=False)
+        if fixture_address == -1:
+            return
+
+        self.address_space.fill_block(fixture_address, fixture_width)
+
+        row = self.rowCount() - 1
+        self.beginInsertRows(QModelIndex(), row, row)
+        self.rows.append([fixture_id,
+                          fixture_address,
+                          fixture_address + fixture_width - 1,
+                          fixture_profile['name'],
+                          self.rowCount() == 0])
+        self.endInsertRows()
+
+    def flags(self, index):
+        return self.columns[index.column()]['flags']
 
 class MidiAddressSpace:
     '''
