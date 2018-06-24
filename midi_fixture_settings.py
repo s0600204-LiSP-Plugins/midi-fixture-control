@@ -46,7 +46,7 @@ class MidiFixtureSettings(SettingsPage):
         self.layout().addWidget(self.patchGroup)
 
         self.patchListView = MidiPatchView()
-        self.patchListModel = SimpleTableModel([
+        self.patchListModel = MidiPatchModel([
             translate('MidiFixtureSettings', 'MIDI #'),
             translate('MidiFixtureSettings', 'To'),
             translate('MidiFixtureSettings', 'Manufacturer & Model'),
@@ -57,6 +57,7 @@ class MidiFixtureSettings(SettingsPage):
 
         self.addToPatchButton = QPushButton(self.patchGroup)
         self.addToPatchButton.setText('Add')
+        self.addToPatchButton.clicked.connect(self._add_patch)
         self.patchGroup.layout().addWidget(self.addToPatchButton, 1, 0)
 
         self.editPatchButton = QPushButton(self.patchGroup)
@@ -67,12 +68,27 @@ class MidiFixtureSettings(SettingsPage):
         self.removeFromPatchButton.setText('Remove')
         self.patchGroup.layout().addWidget(self.removeFromPatchButton, 1, 2)
 
+    def _add_patch(self):
+        fixture_id = self.select_fixture()
+        if not fixture_id:
+            return
+
+        library = get_plugin('MidiFixtureControl').get_library()
+        fixture_profile = library.get_device_profile(fixture_id)
+
+        fixture_label = '{manu} {model}'.format_map({
+            'manu': library.get_manufacturer_list()[fixture_profile['manufacturer']],
+            'model': fixture_profile['name']
+        })
+
+        self.patchListModel.appendPatch(fixture_label, fixture_profile['width'], fixture_id)
+
     def select_fixture(self):
         if self.fixtureSelectDialog.exec_() == self.fixtureSelectDialog.Accepted:
             selected = self.fixtureSelectDialog.selected_fixture()
-            if not selected:
-                return
-            print(selected)
+            if selected:
+                return selected
+        return False
 
     def getSettings(self):
         pass
@@ -86,10 +102,10 @@ class MidiPatchView(QTableView):
     columns = [
         {
             'delegate': SpinBoxDelegate(minimum=1, maximum=16),
-            'width': 64
+            'width': 72
         }, {
             'delegate': LabelDelegate(),
-            'width': 32
+            'width': 28
         }, {
             'delegate': LabelDelegate()
         }, {
@@ -128,3 +144,56 @@ class MidiPatchView(QTableView):
                 self.horizontalHeader().resizeSection(col_idx, col_spec['width'])
             else:
                 self.horizontalHeader().setSectionResizeMode(col_idx, QHeaderView.Stretch)
+
+class MidiPatchModel(SimpleTableModel):
+    def __init__(self, columns):
+        super().__init__(columns)
+        self.address_space = [False for i in range(16)]
+        self.fixture_patch = [None for i in range(16)]
+        print("AS : " + str(self.address_space))
+
+    def appendPatch(self, fixture_label, fixture_width, fixture_id):
+        fixture_address = self._find_space(0, fixture_width, False)
+        if fixture_address == -1:
+            return
+        fixture_end_address = fixture_address + fixture_width
+
+        self.fixture_patch[fixture_address] = fixture_id
+        for idx in range(fixture_address, fixture_end_address):
+            self.address_space[idx] = True
+
+        super().appendRow(fixture_address + 1, fixture_end_address, fixture_label, self.rowCount() == 0)
+
+    def removeRow(self, row):
+        print("AS : " + str(self.address_space))
+        super().removeRow(row)
+
+    def setData(self, index, value, role=Qt.DisplayRole):
+        if not index.isValid():
+            return False
+
+        if index.column() == 0:
+            print(value)
+
+        print("AS : " + str(self.address_space))
+        return super().setData(index, value, role)
+
+    def _find_space(self, start, width, loop=True):
+
+        def _checkWidth(idx):
+            for idx2 in range(width):
+                if (self.address_space[idx + idx2]):
+                    return False
+            return True
+
+        if start + width > 16:
+            start = 0
+            loop = False
+
+        for idx in range(start, len(self.address_space)):
+            if self.address_space[idx] == False and _checkWidth(idx):
+                return idx
+
+        if loop:
+            return self._find_space(0, width, False)
+        return -1
