@@ -18,6 +18,7 @@
 # along with Linux Show Player.  If not, see <http://www.gnu.org/licenses/>.
 
 from copy import copy
+import logging
 
 # pylint: disable=no-name-in-module
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex
@@ -30,6 +31,9 @@ from lisp.ui.qdelegates import RadioButtonDelegate, SpinBoxDelegate
 from lisp.ui.qviews import SimpleTableView
 from lisp.ui.settings.pages import SettingsPage
 from lisp.ui.ui_utils import translate
+
+# pylint: disable=invalid-name
+logger = logging.getLogger(__name__)
 
 class MidiFixtureSettings(SettingsPage):
     Name = "MIDI Fixture Patch"
@@ -73,6 +77,7 @@ class MidiFixtureSettings(SettingsPage):
 
         self.editPatchButton = QPushButton(self.patchGroup)
         self.editPatchButton.setText('Edit')
+        self.editPatchButton.clicked.connect(self._amend_patch)
         self.patchGroup.layout().addWidget(self.editPatchButton, 1, 1)
 
         self.removeFromPatchButton = QPushButton(self.patchGroup)
@@ -85,6 +90,17 @@ class MidiFixtureSettings(SettingsPage):
         if not fixture_id:
             return
         self.patchListModel.appendPatch(fixture_id)
+
+    def _amend_patch(self):
+        if not self.patchListView.selectedIndexes():
+            return
+
+        fixture_id = self.select_fixture()
+        if not fixture_id:
+            return
+
+        self.patchListModel.amendPatch(self.patchListView.selectedIndexes()[0].row(),
+                                       fixture_id)
 
     def _remove_patch(self):
         if not self.patchListView.selectedIndexes():
@@ -114,7 +130,7 @@ class MidiPatchModel(QAbstractTableModel):
         self.columns = [
             {
                 'label': 'Fixture ID',
-                'flags': Qt.NoItemFlags
+                'flags': Qt.ItemIsEditable
             }, {
                 'label': translate('MidiFixtureSettings', 'MIDI #'),
                 'flags': Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable,
@@ -182,11 +198,11 @@ class MidiPatchModel(QAbstractTableModel):
             'model': fixture_profile['name']
         })
 
-    def setData(self, index, value, role=Qt.DisplayRole):
+    def setData(self, index, value, role=Qt.DisplayRole, disable_custom_setter=False):
         # pylint: disable=invalid-name, missing-docstring
         if index.isValid() and self.flags(index) & Qt.ItemIsEditable:
 
-            if 'setter' in self.columns[index.column()]:
+            if not disable_custom_setter and 'setter' in self.columns[index.column()]:
                 value = self.columns[index.column()]['setter'](index.row(), value)
 
             if role == Qt.DisplayRole or role == Qt.EditRole:
@@ -230,6 +246,35 @@ class MidiPatchModel(QAbstractTableModel):
                           None,
                           self.rowCount() == 0])
         self.endInsertRows()
+
+    def amendPatch(self, row, new_fixture_id):
+        if row == -1 or row >= self.rowCount():
+            return
+        library = get_plugin('MidiFixtureControl').get_library()
+        fixture_address = self.data(self.createIndex(row, 1))
+
+        old_fixture_id = self.data(self.createIndex(row, 0))
+        old_fixture_profile = library.get_device_profile(old_fixture_id)
+        old_fixture_width = old_fixture_profile['width']
+
+        new_fixture_profile = library.get_device_profile(new_fixture_id)
+        new_fixture_width = new_fixture_profile['width']
+
+        new_fixture_address = self.address_space.find_block(fixture_address,
+                                                            new_fixture_width,
+                                                            existing=[fixture_address, old_fixture_width])
+        if new_fixture_address == -1:
+            logger.warning("No space for this device!")
+            return
+
+        self.setData(self.createIndex(row, 0), new_fixture_id)
+
+        if fixture_address is not new_fixture_address or old_fixture_width is not new_fixture_width:
+            self.address_space.empty_block(fixture_address, old_fixture_width)
+            self.address_space.fill_block(new_fixture_address, new_fixture_width)
+
+        if fixture_address is not new_fixture_address:
+            self.setData(self.createIndex(row, 1), new_fixture_address, disable_custom_setter=True)
 
     def removePatch(self, row):
         if row == -1 or row >= self.rowCount():
