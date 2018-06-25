@@ -114,10 +114,12 @@ class MidiPatchModel(QAbstractTableModel):
                 'flags': Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable
             }, {
                 'label': translate('MidiFixtureSettings', 'To'),
-                'flags': Qt.ItemIsEnabled | Qt.ItemIsSelectable
+                'flags': Qt.ItemIsEnabled | Qt.ItemIsSelectable,
+                'getter': self._get_midi_address_end
             }, {
                 'label': translate('MidiFixtureSettings', 'Manufacturer & Model'),
-                'flags': Qt.ItemIsEnabled | Qt.ItemIsSelectable
+                'flags': Qt.ItemIsEnabled | Qt.ItemIsSelectable,
+                'getter': self._get_fixture_label
             }, {
                 'label': translate('MidiFixtureSettings', 'Default'),
                 'flags': Qt.ItemIsEditable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable
@@ -143,6 +145,8 @@ class MidiPatchModel(QAbstractTableModel):
     def data(self, index, role=Qt.DisplayRole):
         if index.isValid():
             if role == Qt.DisplayRole or role == Qt.EditRole:
+                if 'getter' in self.columns[index.column()]:
+                    return self.columns[index.column()]['getter'](index.row())
                 return self.rows[index.row()][index.column()]
             elif role == Qt.TextAlignmentRole:
                 return Qt.AlignCenter
@@ -151,9 +155,29 @@ class MidiPatchModel(QAbstractTableModel):
                     return Qt.Checked if index.data(Qt.EditRole) else Qt.Unchecked
         return None
 
+    def _get_midi_address_end(self, row):
+        library = get_plugin('MidiFixtureControl').get_library()
+
+        fixture_id = self.data(self.createIndex(row, 0))
+        fixture_address = self.data(self.createIndex(row, 1))
+        fixture_profile = library.get_device_profile(fixture_id)
+
+        return fixture_profile['width'] + fixture_address - 1
+
+    def _get_fixture_label(self, row):
+        library = get_plugin('MidiFixtureControl').get_library()
+
+        fixture_id = self.data(self.createIndex(row, 0))
+        fixture_profile = library.get_device_profile(fixture_id)
+
+        return '{manu} {model}'.format_map({
+            'manu': library.get_manufacturer_list()[fixture_profile['manufacturer']],
+            'model': fixture_profile['name']
+        })
+
     def setData(self, index, value, role=Qt.DisplayRole):
         # pylint: disable=invalid-name, missing-docstring
-        if index.isValid():
+        if index.isValid() and self.flags(index) & Qt.ItemIsEditable:
             if role == Qt.DisplayRole or role == Qt.EditRole:
                 self.rows[index.row()][index.column()] = value
                 self.dataChanged.emit(self.index(index.row(), 0),
@@ -185,8 +209,8 @@ class MidiPatchModel(QAbstractTableModel):
         self.beginInsertRows(QModelIndex(), row, row)
         self.rows.append([fixture_id,
                           fixture_address,
-                          fixture_address + fixture_width - 1,
-                          fixture_profile['name'],
+                          None,
+                          None,
                           self.rowCount() == 0])
         self.endInsertRows()
 
