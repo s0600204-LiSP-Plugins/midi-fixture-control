@@ -17,6 +17,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Linux Show Player.  If not, see <http://www.gnu.org/licenses/>.
 
+from copy import copy
+
 # pylint: disable=no-name-in-module
 from PyQt5.QtCore import Qt#, QT_TRANSLATE_NOOP
 from PyQt5.QtWidgets import QGridLayout, QGroupBox, QHeaderView, QPushButton, \
@@ -178,22 +180,72 @@ class MidiPatchModel(SimpleTableModel):
         print("AS : " + str(self.address_space))
         return super().setData(index, value, role)
 
-    def _find_space(self, start, width, loop=True):
+class MidiAddressSpace:
+    '''
 
-        def _checkWidth(idx):
-            for idx2 in range(width):
-                if (self.address_space[idx + idx2]):
+    MIDI Channels 1-16 (NOT 0-15)
+    '''
+    def __init__(self):
+        self.address_space = [False for i in range(16)]
+
+    def fill_block(self, start, length):
+        if start < 1 or start > 16 or \
+            length < 1 or length > 16 or \
+            start + length > 17:
+            return False
+        start -= 1
+        working_space = copy(self.address_space)
+
+        for idx in range(start, start + length):
+            if working_space[idx]:
+                return False
+            working_space[idx] = True
+
+        self.address_space = working_space
+        return True
+
+    def empty_block(self, start, length):
+        if start < 1 or start > 16 or \
+            length < 1 or length > 16 or \
+            start + length > 17:
+            return False
+        start -= 1
+        working_space = copy(self.address_space)
+
+        for idx in range(start, start + length):
+            if not working_space[idx]:
+                return False
+            working_space[idx] = False
+
+        self.address_space = working_space
+        return True
+
+    def find_block(self, start, length, existing=False, loop=False):
+        if start < 1 or start > 16 or length < 1 or length > 16:
+            return -1
+        start -= 1
+        working_space = copy(self.address_space)
+
+        if existing:
+            ex_start = max(1, min(existing[0], 16)) - 1
+            ex_end = max(1, min(existing[1] + ex_start, 16))
+            for idx in range(ex_start, ex_end):
+                working_space[idx] = False
+
+        def _check_length(idx):
+            for idx2 in range(length):
+                if idx + idx2 > 15 or working_space[idx + idx2]:
                     return False
             return True
 
-        if start + width > 16:
+        if start + length > 16:
             start = 0
             loop = False
 
         for idx in range(start, len(self.address_space)):
-            if self.address_space[idx] == False and _checkWidth(idx):
-                return idx
+            if not working_space[idx] and _check_length(idx):
+                return idx + 1
 
         if loop:
-            return self._find_space(0, width, False)
+            return self.find_block(0, length, loop=False)
         return -1
