@@ -190,6 +190,12 @@ class MidiPatchModel(QAbstractTableModel):
                 self.dataChanged.emit(self.index(index.row(), 0),
                                       self.index(index.row(), index.column()),
                                       [Qt.CheckStateRole])
+
+                if value is Qt.Checked:
+                    for row_idx in range(0, self.rowCount()):
+                        if row_idx is not index.row():
+                            newIndex = self.createIndex(row_idx, index.column())
+                            self.setData(newIndex, Qt.Unchecked, Qt.CheckStateRole)
                 return True
 
         return False
