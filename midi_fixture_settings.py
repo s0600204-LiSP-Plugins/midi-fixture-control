@@ -77,6 +77,7 @@ class MidiFixtureSettings(SettingsPage):
 
         self.removeFromPatchButton = QPushButton(self.patchGroup)
         self.removeFromPatchButton.setText('Remove')
+        self.removeFromPatchButton.clicked.connect(self._remove_patch)
         self.patchGroup.layout().addWidget(self.removeFromPatchButton, 1, 2)
 
     def _add_patch(self):
@@ -84,6 +85,11 @@ class MidiFixtureSettings(SettingsPage):
         if not fixture_id:
             return
         self.patchListModel.appendPatch(fixture_id)
+
+    def _remove_patch(self):
+        if not self.patchListView.selectedIndexes():
+            return
+        self.patchListModel.removePatch(self.patchListView.selectedIndexes()[0].row())
 
     def select_fixture(self):
         if self.fixtureSelectDialog.exec_() == self.fixtureSelectDialog.Accepted:
@@ -224,6 +230,30 @@ class MidiPatchModel(QAbstractTableModel):
                           None,
                           self.rowCount() == 0])
         self.endInsertRows()
+
+    def removePatch(self, row):
+        if row == -1 or row >= self.rowCount():
+            return
+
+        library = get_plugin('MidiFixtureControl').get_library()
+        fixture_id = self.data(self.createIndex(row, 0))
+        fixture_profile = library.get_device_profile(fixture_id)
+        fixture_address = self.data(self.createIndex(row, 1))
+
+        self.address_space.empty_block(fixture_address, fixture_profile['width'])
+
+        # Check if default device
+        formerly_default = self.data(self.createIndex(row, 4), Qt.CheckStateRole) is Qt.Checked
+
+        self.beginRemoveRows(QModelIndex(), row, row)
+        self.rows.pop(row)
+        self.endRemoveRows()
+
+        # Do this after removing the row:
+        # a. in case we're removing row 0;
+        # b. To not iterate through a row we the remove
+        if formerly_default and self.rowCount():
+            self.setData(self.createIndex(0, 4), Qt.Checked, Qt.CheckStateRole)
 
     def flags(self, index):
         return self.columns[index.column()]['flags']
