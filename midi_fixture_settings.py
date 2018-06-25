@@ -111,7 +111,8 @@ class MidiPatchModel(QAbstractTableModel):
                 'flags': Qt.NoItemFlags
             }, {
                 'label': translate('MidiFixtureSettings', 'MIDI #'),
-                'flags': Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable
+                'flags': Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable,
+                'setter': self._update_midi_address
             }, {
                 'label': translate('MidiFixtureSettings', 'To'),
                 'flags': Qt.ItemIsEnabled | Qt.ItemIsSelectable,
@@ -178,6 +179,10 @@ class MidiPatchModel(QAbstractTableModel):
     def setData(self, index, value, role=Qt.DisplayRole):
         # pylint: disable=invalid-name, missing-docstring
         if index.isValid() and self.flags(index) & Qt.ItemIsEditable:
+
+            if 'setter' in self.columns[index.column()]:
+                value = self.columns[index.column()]['setter'](index.row(), value)
+
             if role == Qt.DisplayRole or role == Qt.EditRole:
                 self.rows[index.row()][index.column()] = value
                 self.dataChanged.emit(self.index(index.row(), 0),
@@ -222,6 +227,26 @@ class MidiPatchModel(QAbstractTableModel):
 
     def flags(self, index):
         return self.columns[index.column()]['flags']
+
+    def _update_midi_address(self, row, value):
+        '''Validates and updates a user-input MIDI Address'''
+        old_address = self.data(self.createIndex(row, 1))
+        new_address = value
+
+        library = get_plugin('MidiFixtureControl').get_library()
+        fixture_id = self.data(self.createIndex(row, 0))
+        fixture_profile = library.get_device_profile(fixture_id)
+        fixture_width = fixture_profile['width']
+
+        new_address = self.address_space.find_block(new_address,
+                                                    fixture_width,
+                                                    existing=[old_address, fixture_width])
+        if new_address == -1:
+            return old_address
+
+        self.address_space.empty_block(old_address, fixture_width)
+        self.address_space.fill_block(new_address, fixture_width)
+        return new_address
 
 class MidiAddressSpace:
     '''
