@@ -39,7 +39,7 @@ class MidiFixtureSettings(SettingsPage):
     Name = "MIDI Fixture Patch"
 
     TABLE_COLUMNS = [
-        None,
+        None, None,
         {
             'delegate': SpinBoxDelegate(minimum=1, maximum=16),
             'width': 72
@@ -126,9 +126,14 @@ class MidiPatchModel(QAbstractTableModel):
     def __init__(self):
         super().__init__()
         self.address_space = MidiAddressSpace()
+        self.patch_count = 0
         self.rows = []
         self.columns = [
             {
+                'id': 'patch_id',
+                'label': 'Patch ID',
+                'flags': Qt.NoItemFlags,
+            }, {
                 'id': 'fixture_id',
                 'label': 'Fixture ID',
                 'flags': Qt.ItemIsEditable
@@ -250,12 +255,14 @@ class MidiPatchModel(QAbstractTableModel):
 
         row = self.rowCount() - 1
         self.beginInsertRows(QModelIndex(), row, row)
-        self.rows.append([fixture_id,
+        self.rows.append(['patch#{0}'.format(self.patch_count),
+                          fixture_id,
                           fixture_address,
                           None,
                           None,
                           self.rowCount() == 0])
         self.endInsertRows()
+        self.patch_count += 1
 
     def amendPatch(self, row, new_fixture_id):
         if row == -1 or row >= self.rowCount():
