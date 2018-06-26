@@ -32,10 +32,10 @@ from lisp.ui.qviews import SimpleTableView
 from lisp.ui.settings.pages import SettingsPage
 from lisp.ui.ui_utils import translate
 
-# pylint: disable=invalid-name
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__) # pylint: disable=invalid-name
 
 class MidiFixtureSettings(SettingsPage):
+    # pylint: disable=invalid-name
     Name = "MIDI Fixture Patch"
 
     TABLE_COLUMNS = [
@@ -72,42 +72,42 @@ class MidiFixtureSettings(SettingsPage):
 
         self.addToPatchButton = QPushButton(self.patchGroup)
         self.addToPatchButton.setText('Add')
-        self.addToPatchButton.clicked.connect(self._add_patch)
+        self.addToPatchButton.clicked.connect(self._addPatch)
         self.patchGroup.layout().addWidget(self.addToPatchButton, 1, 0)
 
         self.editPatchButton = QPushButton(self.patchGroup)
         self.editPatchButton.setText('Edit')
-        self.editPatchButton.clicked.connect(self._amend_patch)
+        self.editPatchButton.clicked.connect(self._amendPatch)
         self.patchGroup.layout().addWidget(self.editPatchButton, 1, 1)
 
         self.removeFromPatchButton = QPushButton(self.patchGroup)
         self.removeFromPatchButton.setText('Remove')
-        self.removeFromPatchButton.clicked.connect(self._remove_patch)
+        self.removeFromPatchButton.clicked.connect(self._removePatch)
         self.patchGroup.layout().addWidget(self.removeFromPatchButton, 1, 2)
 
-    def _add_patch(self):
-        fixture_id = self.select_fixture()
+    def _addPatch(self):
+        fixture_id = self.selectFixture()
         if not fixture_id:
             return
         self.patchListModel.appendPatch(fixture_id)
 
-    def _amend_patch(self):
+    def _amendPatch(self):
         if not self.patchListView.selectedIndexes():
             return
 
-        fixture_id = self.select_fixture()
+        fixture_id = self.selectFixture()
         if not fixture_id:
             return
 
         self.patchListModel.amendPatch(self.patchListView.selectedIndexes()[0].row(),
                                        fixture_id)
 
-    def _remove_patch(self):
+    def _removePatch(self):
         if not self.patchListView.selectedIndexes():
             return
         self.patchListModel.removePatch(self.patchListView.selectedIndexes()[0].row())
 
-    def select_fixture(self):
+    def selectFixture(self):
         if self.fixtureSelectDialog.exec_() == self.fixtureSelectDialog.Accepted:
             selected = self.fixtureSelectDialog.selected_fixture()
             if selected:
@@ -124,6 +124,7 @@ class MidiFixtureSettings(SettingsPage):
         self.patchListModel.deserialise(settings)
 
 class MidiPatchModel(QAbstractTableModel):
+    # pylint: disable=invalid-name
     '''MIDI Patch Model'''
 
     def __init__(self):
@@ -144,21 +145,21 @@ class MidiPatchModel(QAbstractTableModel):
                 'id': 'address',
                 'label': translate('MidiFixtureSettings', 'MIDI #'),
                 'flags': Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable,
-                'setter': self._update_midi_address
+                'setter': self._updateMidiAddress
             }, {
                 'id': 'address_end',
                 'label': translate('MidiFixtureSettings', 'To'),
-                'flags': Qt.ItemIsEnabled | Qt.ItemIsSelectable,
-                'getter': self._get_midi_address_end
+                'flags': Qt.ItemIsSelectable,
+                'getter': self._getMidiAddressEnd
             }, {
                 'id': 'label',
                 'label': translate('MidiFixtureSettings', 'Manufacturer & Model'),
                 'flags': Qt.ItemIsEnabled | Qt.ItemIsSelectable,
-                'getter': self._get_fixture_label
+                'getter': self._getFixtureLabel
             }, {
                 'id': 'default_indicator',
                 'label': translate('MidiFixtureSettings', 'Default'),
-                'flags': Qt.ItemIsEditable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable
+                'flags': Qt.ItemIsEditable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable # pylint: disable=line-too-long
             }
         ]
         self.column_map = {col_spec['id']: col_idx for col_idx, col_spec in enumerate(self.columns)}
@@ -178,6 +179,7 @@ class MidiPatchModel(QAbstractTableModel):
 
         if role == Qt.SizeHintRole and orientation == Qt.Vertical:
             return 0
+        return None
 
     def data(self, index, role=Qt.DisplayRole):
         if index.isValid():
@@ -196,7 +198,7 @@ class MidiPatchModel(QAbstractTableModel):
         # pylint: disable=invalid-name
         return self.createIndex(row, self.column_map[col_id])
 
-    def _get_midi_address_end(self, row):
+    def _getMidiAddressEnd(self, row):
         library = get_plugin('MidiFixtureControl').get_library()
 
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
@@ -205,7 +207,7 @@ class MidiPatchModel(QAbstractTableModel):
 
         return fixture_profile['width'] + fixture_address - 1
 
-    def _get_fixture_label(self, row):
+    def _getFixtureLabel(self, row):
         library = get_plugin('MidiFixtureControl').get_library()
 
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
@@ -231,14 +233,14 @@ class MidiPatchModel(QAbstractTableModel):
                 return True
 
             if role == Qt.CheckStateRole:
-                self.rows[index.row()][index.column()] = True if value is Qt.Checked else False
+                self.rows[index.row()][index.column()] = True if value == Qt.Checked else False
                 self.dataChanged.emit(self.index(index.row(), 0),
                                       self.index(index.row(), index.column()),
                                       [Qt.CheckStateRole])
 
-                if value is Qt.Checked:
+                if value == Qt.Checked:
                     for row_idx in range(0, self.rowCount()):
-                        if row_idx is not index.row():
+                        if row_idx != index.row():
                             newIndex = self.createIndex(row_idx, index.column())
                             self.setData(newIndex, Qt.Unchecked, Qt.CheckStateRole)
                 return True
@@ -282,19 +284,21 @@ class MidiPatchModel(QAbstractTableModel):
 
         new_fixture_address = self.address_space.find_block(fixture_address,
                                                             new_fixture_width,
-                                                            existing=[fixture_address, old_fixture_width])
+                                                            existing=[fixture_address, old_fixture_width]) # pylint: disable=line-too-long
         if new_fixture_address == -1:
             logger.warning("No space for this device!")
             return
 
         self.setData(self.getIndex(row, 'fixture_id'), new_fixture_id)
 
-        if fixture_address is not new_fixture_address or old_fixture_width is not new_fixture_width:
+        if fixture_address != new_fixture_address or old_fixture_width != new_fixture_width:
             self.address_space.empty_block(fixture_address, old_fixture_width)
             self.address_space.fill_block(new_fixture_address, new_fixture_width)
 
-        if fixture_address is not new_fixture_address:
-            self.setData(self.getIndex(row, 'address'), new_fixture_address, disable_custom_setter=True)
+        if fixture_address != new_fixture_address:
+            self.setData(self.getIndex(row, 'address'),
+                         new_fixture_address,
+                         disable_custom_setter=True)
 
     def removePatch(self, row):
         if row == -1 or row >= self.rowCount():
@@ -308,7 +312,7 @@ class MidiPatchModel(QAbstractTableModel):
         self.address_space.empty_block(fixture_address, fixture_profile['width'])
 
         # Check if default device
-        formerly_default = self.data(self.getIndex(row, 'default_indicator'), Qt.CheckStateRole) is Qt.Checked
+        formerly_default = self.data(self.getIndex(row, 'default_indicator'))
 
         self.beginRemoveRows(QModelIndex(), row, row)
         self.rows.pop(row)
@@ -362,7 +366,7 @@ class MidiPatchModel(QAbstractTableModel):
                                           library.get_device_profile(patch['fixture_id'])['width'])
         self.endInsertRows()
 
-    def _update_midi_address(self, row, value):
+    def _updateMidiAddress(self, row, value):
         '''Validates and updates a user-input MIDI Address'''
         old_address = self.data(self.getIndex(row, 'address'))
         new_address = value
