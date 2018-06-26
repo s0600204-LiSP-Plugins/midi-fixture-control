@@ -115,10 +115,13 @@ class MidiFixtureSettings(SettingsPage):
         return False
 
     def getSettings(self):
-        pass
+        conf = {}
+        for key, value in self.patchListModel.serialise().items():
+            conf[key] = value
+        return conf
 
-    def loadSettings(self):
-        pass
+    def loadSettings(self, settings):
+        self.patchListModel.deserialise(settings)
 
 class MidiPatchModel(QAbstractTableModel):
     '''MIDI Patch Model'''
@@ -319,6 +322,45 @@ class MidiPatchModel(QAbstractTableModel):
 
     def flags(self, index):
         return self.columns[index.column()]['flags']
+
+    def serialise(self):
+        '''Serialises the contained patch data, ready for saving to file.'''
+        default_patch = None
+        patches = []
+        for row in self.rows:
+            patches.append({
+                'patch_id': row[self.column_map['patch_id']],
+                'fixture_id': row[self.column_map['fixture_id']],
+                'midi_channel': row[self.column_map['address']] - 1,
+            })
+            if row[self.column_map['default_indicator']]:
+                default_patch = row[self.column_map['patch_id']]
+
+        return {
+            'patches': patches,
+            'default_patch': default_patch,
+            'patch_count': self.patch_count
+        }
+
+    def deserialise(self, config):
+        '''De-serialises from a configuration object, restoring the saved patches.'''
+        if self.rowCount():
+            logger.error('Attempting to deserialise out of sequence.')
+            return
+
+        library = get_plugin('MidiFixtureControl').get_library()
+        self.patch_count = config['patch_count']
+        self.beginInsertRows(QModelIndex(), -1, -1)
+        for patch in config['patches']:
+            self.rows.append([patch['patch_id'],
+                              patch['fixture_id'],
+                              patch['midi_channel'] + 1,
+                              None,
+                              None,
+                              patch['patch_id'] == config['default_patch']]) # Must be `==` not `is`
+            self.address_space.fill_block(patch['midi_channel'] + 1,
+                                          library.get_device_profile(patch['fixture_id'])['width'])
+        self.endInsertRows()
 
     def _update_midi_address(self, row, value):
         '''Validates and updates a user-input MIDI Address'''
