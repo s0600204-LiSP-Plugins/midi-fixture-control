@@ -38,13 +38,19 @@ class FixtureCommandCue(Cue):
         self._midi_out = get_plugin('Midi').output
 
     def __start__(self, fade=False):
-        if not self.fixture_command:
+        if not self.fixture_command or not self.fixture_command['patch_id']:
             return False
-
         plugin_config = get_plugin('MidiFixtureControl').get_config()
+
+        patch_details = None
+        for patch in plugin_config['patches']:
+            if patch['patch_id'] == self.fixture_command['patch_id']:
+                patch_details = patch
+                break
+
         library = get_plugin('MidiFixtureControl').get_library()
-        midi_messages = library.build_device_command(plugin_config['fixture_id'],
-                                                     int(plugin_config['midi_channel']),
+        midi_messages = library.build_device_command(patch_details['fixture_id'],
+                                                     patch_details['midi_channel'],
                                                      self.fixture_command['command'],
                                                      self.fixture_command['args'])
 
@@ -61,31 +67,55 @@ class FixtureCommandCueSettings(SettingsPage):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         library = get_plugin('MidiFixtureControl').get_library()
-        fixture_profile = self._get_fixture_profile()
         self.setLayout(QFormLayout())
 
-        self.fixtureLabel = QLabel(self)
-        self.fixtureLabel.setAlignment(Qt.AlignCenter)
-        self.fixtureLabel.setStyleSheet('font-weight: bold;')
-        self.fixtureLabel.setText('{manufacturer}: {model}'.format_map({
-            'manufacturer': library.get_manufacturer_list()[fixture_profile['manufacturer']],
-            'model': fixture_profile['name']
-        }))
-        self.layout().addRow('Current Fixture:', self.fixtureLabel)
+        def _build_patch_label(patch):
+            fixture_profile = library.get_device_profile(patch['fixture_id'])
+            return '{manufacturer} {model} (@{channel})'.format_map({
+                'manufacturer': library.get_manufacturer_list()[fixture_profile['manufacturer']],
+                'model': fixture_profile['name'],
+                'channel': patch['midi_channel'] + 1})
+
+        # Dropdown of available fixture patches
+        self.patchCombo = QComboBox(self)
+        module_config = get_plugin('MidiFixtureControl').get_config()
+        for patch in module_config['patches']:
+            self.patchCombo.addItem(_build_patch_label(patch), patch['patch_id'])
+        self.patchCombo.currentIndexChanged.connect(self._select_patch)
+        self.layout().addRow('Patched Fixture:', self.patchCombo)
 
         # Dropdown for command type
         self.commandCombo = QComboBox(self)
-        for cmd in fixture_profile['commands']:
-            self.commandCombo.addItem(cmd, cmd)
-        self.commandCombo.currentIndexChanged.connect(self._select_command)
         self.layout().addRow('Command:', self.commandCombo)
 
+        # Horizontal line
         line = QFrame(self)
         line.setFrameShape(QFrame.HLine)
         line.setFrameShadow(QFrame.Sunken)
         self.layout().addRow(line)
 
-        # Command-specific arguments
+    def _select_patch(self, index):
+        # Disconnect and clear command combo
+        if self.commandCombo.receivers(self.commandCombo.currentIndexChanged) > 0:
+            self.commandCombo.currentIndexChanged.disconnect()
+        self.commandCombo.clear()
+
+        # Get profile
+        fixture_profile = self._get_fixture_profile()
+
+        # Supply new command list
+        for cmd in fixture_profile['commands']:
+            self.commandCombo.addItem(cmd, cmd)
+        self.commandCombo.currentIndexChanged.connect(self._select_command)
+
+        # Clear arg list
+        for arg_name, arg_widget in self.argument_sources.items():
+            if arg_widget.isHidden():
+                # If the widget has been `.takeRow`d, running `.removeRow` throws an error.
+                self.layout().addRow('temp', arg_widget)
+            self.layout().removeRow(arg_widget)
+        
+        # Supply arg sources
         self.argument_sources = {}
         for arg_name, arg_definition in fixture_profile['parameters'].items():
             if arg_name in self.argument_sources:
@@ -101,8 +131,12 @@ class FixtureCommandCueSettings(SettingsPage):
                 logging.warning("Unrecognised argument type: {}".format(arg_definition['type']))
                 continue
 
-            self.layout().addRow(arg_name, arg_widget)
             self.argument_sources[arg_name] = arg_widget
+
+            # Explicitly hide the widget, ready for the `.emit()` below
+            arg_widget.hide()
+
+        self.commandCombo.currentIndexChanged.emit(0)
 
     def _select_command(self, index):
         current_command_data = self._get_current_command_data()
@@ -175,6 +209,7 @@ class FixtureCommandCueSettings(SettingsPage):
 
     def getSettings(self):
         conf = {
+            'patch_id': self.patchCombo.currentData(),
             "command": self.commandCombo.currentData(),
             "args": {}
         }
@@ -188,12 +223,19 @@ class FixtureCommandCueSettings(SettingsPage):
     def loadSettings(self, settings):
         conf = settings.get('fixture_command', {})
 
-        # Set to a number > 0 first, so setting to 0 actually does something
-        self.commandCombo.setCurrentIndex(self.commandCombo.count() - 1)
-        self.commandCombo.setCurrentIndex(self.commandCombo.findData(conf['command']) if conf else 0)
+        patch_id = conf['patch_id'] if conf and conf['patch_id'] else get_plugin('MidiFixtureControl').get_config()['default_patch']
+        idx = self.patchCombo.findData(patch_id)
+        self.patchCombo.setCurrentIndex(idx)
+        if not idx: # If idx == 0, then the above line will not have triggered the slot.
+            self.patchCombo.currentIndexChanged.emit(0)
 
         if not conf:
             return
+
+        idx = self.commandCombo.findData(conf['command']) if conf['command'] else 0
+        self.commandCombo.setCurrentIndex(idx)
+        if not idx: # If idx == 0, then the above line will not have triggered the slot.
+            self.commandCombo.currentIndexChanged.emit(0)
 
         for arg_name, arg_value in conf['args'].items():
             if arg_name in self.argument_sources:
@@ -241,10 +283,26 @@ class FixtureCommandCueSettings(SettingsPage):
 
     def _get_fixture_profile(self):
         library = get_plugin('MidiFixtureControl').get_library()
-        module_config = get_plugin('MidiFixtureControl').get_config()
-        return library.get_device_profile(module_config['fixture_id'])
+        plugin_config = get_plugin('MidiFixtureControl').get_config()
+        patch_id = self.patchCombo.currentData()
+        if not patch_id:
+            patch_id = plugin_config['default_patch']
+
+        fixture_id = None
+        for patch in plugin_config['patches']:
+            if patch['patch_id'] == patch_id:
+                fixture_id = patch['fixture_id']
+                break
+
+        if not fixture_id:
+            return None
+
+        return library.get_device_profile(fixture_id)
 
     def _get_current_command_data(self):
-        return self._get_fixture_profile()['commands'][self.commandCombo.currentData()]
+        fixture_profile = self._get_fixture_profile()
+        if fixture_profile:
+            return fixture_profile['commands'][self.commandCombo.currentData()]
+        return {}
 
 CueSettingsRegistry().add(FixtureCommandCueSettings, FixtureCommandCue)
