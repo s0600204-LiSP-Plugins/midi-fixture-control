@@ -22,7 +22,7 @@ from midi_fixture_library import MIDIFixtureLibrary
 from lisp.core.plugin import Plugin
 from lisp.plugins.midi_fixture_control.fixture_command_cue import FixtureCommandCue
 from lisp.plugins.midi_fixture_control.midi_fixture_settings import MidiFixtureSettings
-from lisp.ui.settings.app_configuration import AppConfigurationDialog
+from lisp.ui.settings.session_configuration import SessionConfigurationDialog
 from lisp.ui.ui_utils import translate
 
 class MidiFixtureControl(Plugin):
@@ -40,14 +40,14 @@ class MidiFixtureControl(Plugin):
         self.library_reference = MIDIFixtureLibrary()
 
         # Register the settings widget
-        AppConfigurationDialog.registerSettingsPage(
-            'plugins.midi_fixture_control', MidiFixtureSettings, self.Config)
+        SessionConfigurationDialog.registerSettingsPage(
+            'midi_fixture_control', MidiFixtureSettings, self)
 
         # Register the Fixture Command cue type
         app.register_cue_type(FixtureCommandCue)
 
+    def attach_session_config(self):
+        print(self.SessionConfig)
+
     def get_library(self):
         return self.library_reference
-
-    def get_config(self):
-        return self.Config

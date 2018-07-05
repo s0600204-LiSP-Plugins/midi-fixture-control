@@ -119,6 +119,7 @@ class MidiFixtureSettings(SettingsPage):
         for key, value in self.patchListModel.serialise().items():
             conf[key] = value
         return conf
+        #get_plugin('MidiFixtureControl').WriteSessionConfig(conf)
 
     def loadSettings(self, settings):
         self.patchListModel.deserialise(settings)

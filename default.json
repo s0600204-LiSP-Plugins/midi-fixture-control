@@ -1,7 +1,4 @@
 {
-  "_version_": "2",
-  "_enabled_": true,
-  "default_patch": "",
-  "patches": [],
-  "patch_count": 0
+  "_version_": "3",
+  "_enabled_": true
 }

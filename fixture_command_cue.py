@@ -40,7 +40,8 @@ class FixtureCommandCue(Cue):
     def __start__(self, fade=False):
         if not self.fixture_command or not self.fixture_command['patch_id']:
             return False
-        plugin_config = get_plugin('MidiFixtureControl').get_config()
+
+        plugin_config = get_plugin('MidiFixtureControl').SessionConfig
 
         patch_details = None
         for patch in plugin_config['patches']:
@@ -78,7 +79,7 @@ class FixtureCommandCueSettings(SettingsPage):
 
         # Dropdown of available fixture patches
         self.patchCombo = QComboBox(self)
-        module_config = get_plugin('MidiFixtureControl').get_config()
+        module_config = get_plugin('MidiFixtureControl').SessionConfig
         for patch in module_config['patches']:
             self.patchCombo.addItem(_build_patch_label(patch), patch['patch_id'])
         self.patchCombo.currentIndexChanged.connect(self._select_patch)
@@ -223,7 +224,7 @@ class FixtureCommandCueSettings(SettingsPage):
     def loadSettings(self, settings):
         conf = settings.get('fixture_command', {})
 
-        patch_id = conf['patch_id'] if conf and conf['patch_id'] else get_plugin('MidiFixtureControl').get_config()['default_patch']
+        patch_id = conf['patch_id'] if conf and conf['patch_id'] else get_plugin('MidiFixtureControl').SessionConfig['default_patch']
         idx = self.patchCombo.findData(patch_id)
         self.patchCombo.setCurrentIndex(idx)
         if not idx: # If idx == 0, then the above line will not have triggered the slot.
@@ -283,10 +284,8 @@ class FixtureCommandCueSettings(SettingsPage):
 
     def _get_fixture_profile(self):
         library = get_plugin('MidiFixtureControl').get_library()
-        plugin_config = get_plugin('MidiFixtureControl').get_config()
-        patch_id = self.patchCombo.currentData()
-        if not patch_id:
-            patch_id = plugin_config['default_patch']
+        plugin_config = get_plugin('MidiFixtureControl').SessionConfig
+        patch_id = self.patchCombo.currentData() or plugin_config['default_patch']
 
         fixture_id = None
         for patch in plugin_config['patches']:
