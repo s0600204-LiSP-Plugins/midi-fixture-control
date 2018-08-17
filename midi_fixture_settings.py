@@ -26,7 +26,7 @@ from PyQt5.QtWidgets import QGridLayout, QGroupBox, QPushButton, QVBoxLayout
 
 from lisp.plugins import get_plugin
 from lisp.plugins.midi_fixture_control.midi_fixture_select import FixtureSelectDialog
-from lisp.plugins.midi_fixture_control.ui import LabelDelegate
+from lisp.plugins.midi_fixture_control.ui import LabelDelegate, RadioButtonHidableDelegate
 from lisp.ui.qdelegates import RadioButtonDelegate, SpinBoxDelegate
 from lisp.ui.qviews import SimpleTableView
 from lisp.ui.settings.pages import SettingsPage
@@ -51,6 +51,9 @@ class MidiFixtureSettings(SettingsPage):
         }, {
             'delegate': RadioButtonDelegate(),
             'width': 64
+        }, {
+            'delegate': RadioButtonHidableDelegate(),
+            'width': 48
         }
     ]
 
@@ -161,6 +164,11 @@ class MidiPatchModel(QAbstractTableModel):
                 'id': 'default_indicator',
                 'label': translate('MidiFixtureSettings', 'Default'),
                 'flags': Qt.ItemIsEditable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable # pylint: disable=line-too-long
+            }, {
+                'id': 'dca_indicator',
+                'label': translate('MidiFixtureSettings', 'DCA'),
+                'flags': Qt.ItemIsEditable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable, # pylint: disable=line-too-long
+                'flags_alt': Qt.ItemIsSelectable
             }
         ]
         self.column_map = {col_spec['id']: col_idx for col_idx, col_spec in enumerate(self.columns)}
@@ -192,7 +200,7 @@ class MidiPatchModel(QAbstractTableModel):
                 return Qt.AlignCenter
             elif role == Qt.CheckStateRole:
                 if self.flags(index) & Qt.ItemIsUserCheckable:
-                    return Qt.Checked if index.data(Qt.EditRole) else Qt.Unchecked
+                    return Qt.Checked if index.data(Qt.EditRole) == True else Qt.Unchecked
         return None
 
     def getIndex(self, row, col_id):
@@ -257,6 +265,13 @@ class MidiPatchModel(QAbstractTableModel):
         if fixture_address == -1:
             return
 
+        supports_dca = 'dcaAssign' in fixture_profile['commands']
+        set_dca = True
+        for r in range(self.rowCount()):
+            if self.flags(self.getIndex(r, 'dca_indicator')) & Qt.ItemIsUserCheckable:
+                set_dca = False
+                break
+
         self.address_space.fill_block(fixture_address, fixture_width)
 
         row = self.rowCount() - 1
@@ -266,7 +281,8 @@ class MidiPatchModel(QAbstractTableModel):
                           fixture_address,
                           None,
                           None,
-                          self.rowCount() == 0])
+                          self.rowCount() == 0,
+                          -1 if not supports_dca else set_dca])
         self.endInsertRows()
         self.patch_count += 1
 
@@ -326,11 +342,14 @@ class MidiPatchModel(QAbstractTableModel):
             self.setData(self.getIndex(0, 'default_indicator'), Qt.Checked, Qt.CheckStateRole)
 
     def flags(self, index):
+        if self.data(index, Qt.EditRole) == -1:
+            return self.columns[index.column()]['flags_alt']
         return self.columns[index.column()]['flags']
 
     def serialise(self):
         '''Serialises the contained patch data, ready for saving to file.'''
         default_patch = None
+        dca_device = None
         patches = []
         for row in self.rows:
             patches.append({
@@ -340,10 +359,13 @@ class MidiPatchModel(QAbstractTableModel):
             })
             if row[self.column_map['default_indicator']]:
                 default_patch = row[self.column_map['patch_id']]
+            if row[self.column_map['dca_indicator']] == True:
+                dca_device = row[self.column_map['patch_id']]
 
         return {
             'patches': patches,
             'default_patch': default_patch,
+            'dca_device': dca_device,
             'patch_count': self.patch_count
         }
 
@@ -357,14 +379,16 @@ class MidiPatchModel(QAbstractTableModel):
         self.patch_count = config['patch_count']
         self.beginInsertRows(QModelIndex(), -1, -1)
         for patch in config['patches']:
+            fixture_profile = library.get_device_profile(patch['fixture_id'])
+            supports_dca = 'dcaAssign' in fixture_profile['commands']
             self.rows.append([patch['patch_id'],
                               patch['fixture_id'],
                               patch['midi_channel'] + 1,
                               None,
                               None,
-                              patch['patch_id'] == config['default_patch']]) # Must be `==` not `is`
-            self.address_space.fill_block(patch['midi_channel'] + 1,
-                                          library.get_device_profile(patch['fixture_id'])['width'])
+                              patch['patch_id'] == config['default_patch'],
+                              -1 if not supports_dca else patch['patch_id'] == config['dca_device']])
+            self.address_space.fill_block(patch['midi_channel'] + 1, fixture_profile['width'])
         self.endInsertRows()
 
     def _updateMidiAddress(self, row, value):
