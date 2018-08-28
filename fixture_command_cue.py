@@ -87,26 +87,26 @@ class FixtureCommandCueSettings(SettingsPage):
 
         # Command-specific arguments
         self.argument_sources = {}
-        for cmd in fixture_profile['commands']:
-            for arg_name, arg_definition in fixture_profile['commands'][cmd].items():
-                if arg_name in self.argument_sources:
-                    continue
+        for arg_name, arg_definition in fixture_profile['parameters'].items():
+            if arg_name in self.argument_sources:
+                continue
 
-                if arg_definition['type'] == 'numeric':
-                    arg_widget = QSpinBox(self)
-                elif arg_definition['type'] == 'dropdown':
-                    arg_widget = QComboBox(self)
-                elif arg_definition['type'] == 'textual':
-                    arg_widget = QLineEdit(self)
-                else:
-                    logging.warning("Unrecognised argument type: {}".format(arg_definition['type']))
-                    continue
+            if arg_definition['type'] == 'numeric':
+                arg_widget = QSpinBox(self)
+            elif arg_definition['type'] == 'dropdown':
+                arg_widget = QComboBox(self)
+            elif arg_definition['type'] == 'textual':
+                arg_widget = QLineEdit(self)
+            else:
+                logging.warning("Unrecognised argument type: {}".format(arg_definition['type']))
+                continue
 
-                self.layout().addRow(arg_name, arg_widget)
-                self.argument_sources[arg_name] = arg_widget
+            self.layout().addRow(arg_name, arg_widget)
+            self.argument_sources[arg_name] = arg_widget
 
     def _select_command(self, index):
         current_command_data = self._get_current_command_data()
+        fixture_profile = self._get_fixture_profile()
 
         # Hide all currently displayed argument-receiving widgets
         for arg_widget in self.argument_sources.values():
@@ -116,7 +116,7 @@ class FixtureCommandCueSettings(SettingsPage):
                 arg_widget.hide()
 
         # Show appropriate argument-receiving widgets, and set to defaults
-        for arg_name, arg_definition in current_command_data.items():
+        for arg_name in current_command_data:
             arg_widget = self.argument_sources[arg_name]
             arg_widget.show()
             self.layout().addRow(arg_name, arg_widget)
@@ -136,19 +136,22 @@ class FixtureCommandCueSettings(SettingsPage):
         conditional = []
         # Give argument-receiving widgets their actual values.
         # This must be done *after* setting to defaults.
-        for arg_name, arg_definition in current_command_data.items():
+        for arg_name, arg_definition_specific in current_command_data.items():
+            arg_definition = fixture_profile['parameters'][arg_name]
+
             if 'valuesConditionalOn' in arg_definition:
                 if arg_definition['valuesConditionalOn'] not in conditional:
                     conditional.append(arg_definition['valuesConditionalOn'])
                 continue
-
+            
+            values = arg_definition_specific.get('values', arg_definition.get('values', []))
             arg_widget = self.argument_sources[arg_name]
             if isinstance(arg_widget, QSpinBox):
-                limit = (limit for limit in arg_definition['values'])
+                limit = (limit for limit in values)
                 arg_widget.setRange(next(limit), next(limit))
 
             elif isinstance(arg_widget, QComboBox):
-                for option in arg_definition['values']:
+                for option in values:
                     arg_widget.addItem(option, option)
 
             elif isinstance(arg_widget, QLineEdit):
@@ -218,16 +221,20 @@ class FixtureCommandCueSettings(SettingsPage):
     def _change_dependant_argument(self, transmitter_name):
         current_command_data = self._get_current_command_data()
         current_value = self._get_value_from_argument_widget(transmitter_name)
+        fixture_profile = self._get_fixture_profile()
 
-        for arg_name, arg_definition in current_command_data.items():
+        for arg_name, arg_definition_specific in current_command_data.items():
+            arg_definition = fixture_profile['parameters'][arg_name]
             if 'valuesConditionalOn' in arg_definition and arg_definition['valuesConditionalOn'] == transmitter_name:
+                values = arg_definition_specific.get('values', arg_definition.get('values', {}))
                 arg_widget = self.argument_sources[arg_name]
+
                 if isinstance(arg_widget, QSpinBox):
-                    limit = (limit for limit in arg_definition['values'][current_value])
+                    limit = (limit for limit in values[current_value])
                     self.argument_sources[arg_name].setRange(next(limit), next(limit))
 
                 elif isinstance(arg_widget, QComboBox):
-                    for option in arg_definition['values'][current_value]:
+                    for option in values[current_value]:
                         arg_widget.addItem(option, option)
 
                 # todo: handle other potential cases
