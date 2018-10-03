@@ -22,14 +22,14 @@ from PyQt5.QtWidgets import QVBoxLayout, QFormLayout, QGroupBox, QLabel, QSpinBo
 
 from lisp.plugins import get_plugin
 from lisp.plugins.midi_fixture_control.midi_fixture_select import FixtureSelectDialog
-from lisp.ui.settings.pages import ConfigurationPage
+from lisp.ui.settings.pages import SettingsPage
 from lisp.ui.ui_utils import translate
 
-class MidiFixtureSettings(ConfigurationPage):
+class MidiFixtureSettings(SettingsPage):
     Name = "MIDI Fixture Control"
 
-    def __init__(self, config, **kwargs):
-        super().__init__(config, **kwargs)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
         self.setLayout(QVBoxLayout())
         self.layout().setAlignment(Qt.AlignTop)
 
@@ -65,8 +65,6 @@ class MidiFixtureSettings(ConfigurationPage):
         self.midiChannelSpin.setRange(1, 16)
         self.midiChannelLayout.addRow(translate('MidiFixtureSettings', 'MIDI Channel'), self.midiChannelSpin)
 
-        self.loadConfiguration()
-
     def select_fixture(self):
         if self.fixtureSelectDialog.exec_() == self.fixtureSelectDialog.Accepted:
             selected = self.fixtureSelectDialog.selected_fixture()
@@ -82,14 +80,16 @@ class MidiFixtureSettings(ConfigurationPage):
             self.fixtureModelLabel.setText(fixture['name'])
             self.midiChannelSpin.setRange(1, 17 - fixture['width'])
 
-    def applySettings(self):
-        self.config['midi_channel'] = self.midiChannelSpin.value() - 1
+    def getSettings(self):
+        conf = {
+            'midi_channel':self.midiChannelSpin.value() - 1
+        }
         if self.selectedFixtureID:
-            self.config['fixture_id'] = self.selectedFixtureID
-        self.config.write()
+            conf['fixture_id'] = self.selectedFixtureID
+        return conf
 
-    def loadConfiguration(self):
-        self.midiChannelSpin.setValue(self.config['midi_channel'] + 1)
-        if self.config['fixture_id']:
-            self.selectedFixtureID = self.config['fixture_id'] # todo: validate
+    def loadSettings(self, settings):
+        self.midiChannelSpin.setValue(settings['midi_channel'] + 1)
+        if settings['fixture_id']:
+            self.selectedFixtureID = settings['fixture_id'] # todo: validate
             self._refresh_fixture()
