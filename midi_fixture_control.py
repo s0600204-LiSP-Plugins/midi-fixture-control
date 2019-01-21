@@ -20,10 +20,11 @@
 from midi_fixture_library import MIDIFixtureLibrary
 
 from lisp.core.plugin import Plugin
-from lisp.plugins.midi_fixture_control.fixture_command_cue import FixtureCommandCue
-from lisp.plugins.midi_fixture_control.midi_fixture_settings import MidiFixtureSettings
 from lisp.ui.settings.session_configuration import SessionConfigurationDialog
 from lisp.ui.ui_utils import translate
+
+from .fixture_command_cue import FixtureCommandCue
+from .midi_fixture_settings import MidiFixtureSettings
 
 class MidiFixtureControl(Plugin):
     """Provides the ability to control a pre-identified MIDI fixture"""
