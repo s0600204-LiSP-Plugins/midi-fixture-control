@@ -17,9 +17,11 @@
 # You should have received a copy of the GNU General Public License
 # along with Linux Show Player.  If not, see <http://www.gnu.org/licenses/>.
 
+from PyQt5.QtCore import QT_TRANSLATE_NOOP
 from midi_fixture_library import MIDIFixtureLibrary
 
 from lisp.core.plugin import Plugin
+from lisp.cues.cue_factory import CueFactory
 from lisp.ui.settings.session_configuration import SessionConfigurationDialog
 from lisp.ui.ui_utils import translate
 
@@ -45,7 +47,10 @@ class MidiFixtureControl(Plugin):
             'midi_fixture_control', MidiFixtureSettings, self)
 
         # Register the Fixture Command cue type
-        app.register_cue_type(FixtureCommandCue)
+        CueFactory.register_factory(FixtureCommandCue.__name__, FixtureCommandCue)
+        app.window.registerSimpleCueMenu(
+            FixtureCommandCue, QT_TRANSLATE_NOOP("CueCategory", "Integration cues")
+        )
 
     def attach_session_config(self):
         print(self.SessionConfig)
