@@ -105,8 +105,8 @@ class FixtureCommandCueSettings(SettingsPage):
         fixture_profile = self._get_fixture_profile()
 
         # Supply new command list
-        for cmd in fixture_profile['commands']:
-            self.commandCombo.addItem(cmd, cmd)
+        for cmd, details in fixture_profile['commands'].items():
+            self.commandCombo.addItem(details['caption'], cmd)
         self.commandCombo.currentIndexChanged.connect(self._select_command)
 
         # Clear arg list
@@ -140,7 +140,7 @@ class FixtureCommandCueSettings(SettingsPage):
         self.commandCombo.currentIndexChanged.emit(0)
 
     def _select_command(self, index):
-        current_command_data = self._get_current_command_data()
+        current_command_parameters = self._get_current_command_parameters()
         fixture_profile = self._get_fixture_profile()
 
         # Hide all currently displayed argument-receiving widgets
@@ -151,10 +151,10 @@ class FixtureCommandCueSettings(SettingsPage):
                 arg_widget.hide()
 
         # Show appropriate argument-receiving widgets, and set to defaults
-        for arg_name in current_command_data:
+        for arg_name in current_command_parameters:
             arg_widget = self.argument_sources[arg_name]
             arg_widget.show()
-            self.layout().addRow(arg_name, arg_widget)
+            self.layout().addRow(fixture_profile['parameters'][arg_name]['caption'], arg_widget)
             if isinstance(arg_widget, QSpinBox):
                 if arg_widget.receivers(arg_widget.valueChanged) > 0:
                     arg_widget.valueChanged.disconnect()
@@ -171,7 +171,7 @@ class FixtureCommandCueSettings(SettingsPage):
         conditional = []
         # Give argument-receiving widgets their actual values.
         # This must be done *after* setting to defaults.
-        for arg_name, arg_definition_specific in current_command_data.items():
+        for arg_name, arg_definition_specific in current_command_parameters.items():
             arg_definition = fixture_profile['parameters'][arg_name]
 
             if 'valuesConditionalOn' in arg_definition:
@@ -187,7 +187,7 @@ class FixtureCommandCueSettings(SettingsPage):
 
             elif isinstance(arg_widget, QComboBox):
                 for option in values:
-                    arg_widget.addItem(option, option)
+                    arg_widget.addItem(values[option], option)
 
             elif isinstance(arg_widget, QLineEdit):
                 continue # nothing to do here
@@ -214,9 +214,9 @@ class FixtureCommandCueSettings(SettingsPage):
             "command": self.commandCombo.currentData(),
             "args": {}
         }
-        current_command_data = self._get_current_command_data()
+        current_command_parameters = self._get_current_command_parameters()
 
-        for arg_name, arg_definition in current_command_data.items():
+        for arg_name, arg_definition in current_command_parameters.items():
             conf["args"][arg_name] = self._get_value_from_argument_widget(arg_name)
 
         return {'fixture_command': conf}
@@ -262,11 +262,11 @@ class FixtureCommandCueSettings(SettingsPage):
         return ""
 
     def _change_dependant_argument(self, transmitter_name):
-        current_command_data = self._get_current_command_data()
+        current_command_parameters = self._get_current_command_parameters()
         current_value = self._get_value_from_argument_widget(transmitter_name)
         fixture_profile = self._get_fixture_profile()
 
-        for arg_name, arg_definition_specific in current_command_data.items():
+        for arg_name, arg_definition_specific in current_command_parameters.items():
             arg_definition = fixture_profile['parameters'][arg_name]
             if 'valuesConditionalOn' in arg_definition and arg_definition['valuesConditionalOn'] == transmitter_name:
                 values = arg_definition_specific.get('values', arg_definition.get('values', {}))
@@ -298,10 +298,10 @@ class FixtureCommandCueSettings(SettingsPage):
 
         return library.get_device_profile(fixture_id)
 
-    def _get_current_command_data(self):
+    def _get_current_command_parameters(self):
         fixture_profile = self._get_fixture_profile()
         if fixture_profile:
-            return fixture_profile['commands'][self.commandCombo.currentData()]
+            return fixture_profile['commands'][self.commandCombo.currentData()]['parameters']
         return {}
 
 CueSettingsRegistry().add(FixtureCommandCueSettings, FixtureCommandCue)
