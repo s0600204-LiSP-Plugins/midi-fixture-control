@@ -107,32 +107,32 @@ class FixtureCommandCueSettings(SettingsPage):
         self.command_combo.currentIndexChanged.connect(self._select_command)
 
         # Clear arg list
-        for arg_name, arg_widget in self.argument_sources.items():
-            if arg_widget.isHidden():
+        for name, widget in self.argument_sources.items():
+            if widget.isHidden():
                 # If the widget has been `.takeRow`d, running `.removeRow` throws an error.
-                self.layout().addRow('temp', arg_widget)
-            self.layout().removeRow(arg_widget)
+                self.layout().addRow('temp', widget)
+            self.layout().removeRow(widget)
 
         # Supply arg sources
         self.argument_sources = {}
-        for arg_name, arg_definition in fixture_profile.parameters().items():
-            if arg_name in self.argument_sources:
+        for name, definition in fixture_profile.parameters().items():
+            if name in self.argument_sources:
                 continue
 
-            if arg_definition['type'] == 'numeric':
-                arg_widget = QSpinBox(self)
-            elif arg_definition['type'] == 'dropdown':
-                arg_widget = QComboBox(self)
-            elif arg_definition['type'] == 'textual':
-                arg_widget = QLineEdit(self)
+            if definition['type'] == 'numeric':
+                widget = QSpinBox(self)
+            elif definition['type'] == 'dropdown':
+                widget = QComboBox(self)
+            elif definition['type'] == 'textual':
+                widget = QLineEdit(self)
             else:
-                logging.warning("Unrecognised argument type: %s", {arg_definition['type']})
+                logging.warning("Unrecognised argument type: %s", {definition['type']})
                 continue
 
-            self.argument_sources[arg_name] = arg_widget
+            self.argument_sources[name] = widget
 
             # Explicitly hide the widget, ready for the `.emit()` below
-            arg_widget.hide()
+            widget.hide()
 
         self.command_combo.currentIndexChanged.emit(0)
 
@@ -142,73 +142,73 @@ class FixtureCommandCueSettings(SettingsPage):
         parameter_list = self._get_current_parameter_list()
 
         # Hide all currently displayed argument-receiving widgets
-        for arg_widget in self.argument_sources.values():
-            if not arg_widget.isHidden():
-                row = self.layout().takeRow(arg_widget)
+        for widget in self.argument_sources.values():
+            if not widget.isHidden():
+                row = self.layout().takeRow(widget)
                 row.labelItem.widget().hide()
-                arg_widget.hide()
+                widget.hide()
 
-        # Show appropriate argument-receiving widgets, and set to defaults
-        for arg_name in parameter_list:
-            arg_widget = self.argument_sources[arg_name]
-            arg_widget.show()
-            self.layout().addRow(parameter_definitions[arg_name]['caption'], arg_widget)
+        # Show appropriate widgets, and set to defaults
+        for name in parameter_list:
+            widget = self.argument_sources[name]
+            widget.show()
+            self.layout().addRow(parameter_definitions[name]['caption'], widget)
 
-            if isinstance(arg_widget, QSpinBox):
-                if arg_widget.receivers(arg_widget.valueChanged) > 0:
-                    arg_widget.valueChanged.disconnect()
-                arg_widget.setRange(1, 1)
+            if isinstance(widget, QSpinBox):
+                if widget.receivers(widget.valueChanged) > 0:
+                    widget.valueChanged.disconnect()
+                widget.setRange(1, 1)
 
-            elif isinstance(arg_widget, QComboBox):
-                if arg_widget.receivers(arg_widget.currentIndexChanged) > 0:
-                    arg_widget.currentIndexChanged.disconnect()
-                arg_widget.clear()
+            elif isinstance(widget, QComboBox):
+                if widget.receivers(widget.currentIndexChanged) > 0:
+                    widget.currentIndexChanged.disconnect()
+                widget.clear()
 
-            elif isinstance(arg_widget, QLineEdit):
-                arg_widget.clear()
+            elif isinstance(widget, QLineEdit):
+                widget.clear()
 
         conditional = []
-        # Give argument-receiving widgets their actual values.
+        # Give input widgets their actual value ranges.
         # This must be done *after* setting to defaults.
-        for arg_name, values in parameter_list.items():
-            definition = parameter_definitions[arg_name]
+        for name, values in parameter_list.items():
+            definition = parameter_definitions[name]
 
             if 'valuesConditionalOn' in definition:
                 if definition['valuesConditionalOn'] not in conditional:
                     conditional.append(definition['valuesConditionalOn'])
                 continue
 
-            arg_widget = self.argument_sources[arg_name]
-            if isinstance(arg_widget, QSpinBox):
+            widget = self.argument_sources[name]
+            if isinstance(widget, QSpinBox):
                 limit = (limit for limit in values)
-                arg_widget.setRange(next(limit), next(limit))
+                widget.setRange(next(limit), next(limit))
 
-            elif isinstance(arg_widget, QComboBox):
+            elif isinstance(widget, QComboBox):
                 for option in values:
-                    arg_widget.addItem(values[option], option)
+                    widget.addItem(values[option], option)
 
-            elif isinstance(arg_widget, QLineEdit):
+            elif isinstance(widget, QLineEdit):
                 continue # nothing to do here
 
         # Attach liste-, uh, 'slots' where necessary.
-        for arg_name in conditional:
-            arg_widget = self.argument_sources[arg_name]
-            if isinstance(arg_widget, QSpinBox):
-                arg_widget.valueChanged.connect(
-                    lambda idx: self._change_dependant_argument(arg_name))
-                arg_widget.valueChanged.emit(0)
+        for name in conditional:
+            widget = self.argument_sources[name]
+            if isinstance(widget, QSpinBox):
+                widget.valueChanged.connect(
+                    lambda idx: self._change_dependant_argument(name))
+                widget.valueChanged.emit(0)
 
-            elif isinstance(arg_widget, QComboBox):
-                arg_widget.currentIndexChanged.connect(
-                    lambda idx: self._change_dependant_argument(arg_name))
-                arg_widget.currentIndexChanged.emit(0)
+            elif isinstance(widget, QComboBox):
+                widget.currentIndexChanged.connect(
+                    lambda idx: self._change_dependant_argument(name))
+                widget.currentIndexChanged.emit(0)
 
             else:
                 # Any new entries:
                 #  - Disconnect liste-, uh, 'slots' above.
                 logging.debug(
                     "Need a function for dealing with an input depending on a %s",
-                    {type(arg_widget)}
+                    {type(widget)}
                 )
 
     # pylint: disable=invalid-name
@@ -220,8 +220,8 @@ class FixtureCommandCueSettings(SettingsPage):
         }
         parameter_list = self._get_current_parameter_list()
 
-        for arg_name in parameter_list.keys():
-            conf["args"][arg_name] = self._get_value_from_argument_widget(arg_name)
+        for name in parameter_list.keys():
+            conf["args"][name] = self._get_value_from_argument_widget(name)
 
         return {'fixture_command': conf}
 
@@ -229,7 +229,10 @@ class FixtureCommandCueSettings(SettingsPage):
     def loadSettings(self, settings):
         conf = settings.get('fixture_command', {})
 
-        patch_id = conf['patch_id'] if conf and conf['patch_id'] else get_plugin('MidiFixtureControl').SessionConfig['default_patch']
+        if conf and conf['patch_id']:
+            patch_id = conf['patch_id']
+        else:
+            patch_id = get_plugin('MidiFixtureControl').SessionConfig['default_patch']
         idx = self.patch_combo.findData(patch_id)
         self.patch_combo.setCurrentIndex(idx)
         if not idx: # If idx == 0, then the above line will not have triggered the slot.
@@ -243,27 +246,27 @@ class FixtureCommandCueSettings(SettingsPage):
         if not idx: # If idx == 0, then the above line will not have triggered the slot.
             self.command_combo.currentIndexChanged.emit(0)
 
-        for arg_name, arg_value in conf['args'].items():
-            if arg_name in self.argument_sources:
-                arg_widget = self.argument_sources[arg_name]
-                if isinstance(arg_widget, QSpinBox):
-                    arg_widget.setValue(arg_value)
+        for name, value in conf['args'].items():
+            if name in self.argument_sources:
+                widget = self.argument_sources[name]
+                if isinstance(widget, QSpinBox):
+                    widget.setValue(value)
 
-                elif isinstance(arg_widget, QComboBox):
-                    idx = arg_widget.findData(arg_value)
-                    arg_widget.setCurrentIndex(idx if idx > -1 else 0)
+                elif isinstance(widget, QComboBox):
+                    idx = widget.findData(value)
+                    widget.setCurrentIndex(idx if idx > -1 else 0)
 
-                elif isinstance(arg_widget, QLineEdit):
-                    arg_widget.setText(arg_value)
+                elif isinstance(widget, QLineEdit):
+                    widget.setText(value)
 
     def _get_value_from_argument_widget(self, widget_name):
-        arg_widget = self.argument_sources[widget_name]
-        if isinstance(arg_widget, QSpinBox):
-            return arg_widget.value()
-        if isinstance(arg_widget, QComboBox):
-            return arg_widget.currentData()
-        if isinstance(arg_widget, QLineEdit):
-            return arg_widget.text()
+        widget = self.argument_sources[widget_name]
+        if isinstance(widget, QSpinBox):
+            return widget.value()
+        if isinstance(widget, QComboBox):
+            return widget.currentData()
+        if isinstance(widget, QLineEdit):
+            return widget.text()
         return ""
 
     def _change_dependant_argument(self, transmitter_name):
@@ -272,20 +275,21 @@ class FixtureCommandCueSettings(SettingsPage):
         parameter_list = self._get_current_parameter_list()
         current_value = self._get_value_from_argument_widget(transmitter_name)
 
-        for arg_name, values in parameter_list.items():
-            definition = parameter_definitions[arg_name]
-            if 'valuesConditionalOn' in definition and definition['valuesConditionalOn'] == transmitter_name:
-                arg_widget = self.argument_sources[arg_name]
+        for name, values in parameter_list.items():
+            definition = parameter_definitions[name]
+            if ('valuesConditionalOn' in definition
+                    and definition['valuesConditionalOn'] == transmitter_name):
+                widget = self.argument_sources[name]
 
-                if isinstance(arg_widget, QSpinBox):
+                if isinstance(widget, QSpinBox):
                     limit = (limit for limit in values[current_value])
-                    self.argument_sources[arg_name].setRange(next(limit), next(limit))
+                    self.argument_sources[name].setRange(next(limit), next(limit))
 
-                elif isinstance(arg_widget, QComboBox):
+                elif isinstance(widget, QComboBox):
                     for option in values[current_value]:
-                        arg_widget.addItem(option, option)
+                        widget.addItem(option, option)
 
-                # todo: handle other potential cases
+                # @todo: handle other potential cases
 
     def _get_current_fixture_profile(self):
         return get_plugin('MidiFixtureControl').get_profile(self.patch_combo.currentData())

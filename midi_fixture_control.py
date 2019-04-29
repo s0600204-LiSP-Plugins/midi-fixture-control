@@ -19,13 +19,15 @@
 
 import logging
 
+# pylint: disable=no-name-in-module
 from PyQt5.QtCore import QT_TRANSLATE_NOOP
+
 from midi_fixture_library import MIDIFixture, FixtureWidthError
 
+# pylint: disable=import-error
 from lisp.core.plugin import Plugin
 from lisp.cues.cue_factory import CueFactory
 from lisp.ui.settings.session_configuration import SessionConfigurationDialog
-from lisp.ui.ui_utils import translate
 
 from .fixture_command_cue import FixtureCommandCue
 from .midi_fixture_settings import MidiFixtureSettings
@@ -76,7 +78,8 @@ class MidiFixtureControl(Plugin):
                 patch_id = patch['patch_id']
 
                 if patch_id not in self.fixtures:
-                    self.fixtures[patch_id] = MIDIFixture(patch['fixture_id'], patch['midi_channel'])
+                    self.fixtures[patch_id] = MIDIFixture(patch['fixture_id'],
+                                                          patch['midi_channel'])
                     continue
 
                 if patch['fixture_id'] != self.fixtures[patch_id].fixture_id:

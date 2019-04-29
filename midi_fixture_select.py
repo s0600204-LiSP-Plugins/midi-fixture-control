@@ -17,11 +17,14 @@
 # You should have received a copy of the GNU General Public License
 # along with Linux Show Player.  If not, see <http://www.gnu.org/licenses/>.
 
+# pylint: disable=no-name-in-module
+from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QDialog, QGridLayout, QVBoxLayout, QFormLayout, QGroupBox, QComboBox, \
+    QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QHeaderView
+
 from midi_fixture_library import MIDIFixtureCatalogue
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QDialog, QGridLayout, QVBoxLayout, QFormLayout, QGroupBox, QComboBox, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QHeaderView
-
+# pylint: disable=import-error
 from lisp.ui.ui_utils import translate
 
 class FixtureSelectDialog(QDialog):
@@ -35,43 +38,45 @@ class FixtureSelectDialog(QDialog):
 
         self.setLayout(QGridLayout())
 
-        self.manufacturerGroup = QGroupBox(self)
-        self.manufacturerGroup.setTitle(translate("MidiFixtureSettings", "Manufacturer"))
-        self.manufacturerGroup.setLayout(QVBoxLayout())
-        self.manufacturerGroup.layout().setAlignment(Qt.AlignTop)
-        self.layout().addWidget(self.manufacturerGroup, 0, 0)
+        self.manufacturer_group = QGroupBox(self)
+        self.manufacturer_group.setTitle(translate("MidiFixtureSettings", "Manufacturer"))
+        self.manufacturer_group.setLayout(QVBoxLayout())
+        self.manufacturer_group.layout().setAlignment(Qt.AlignTop)
+        self.layout().addWidget(self.manufacturer_group, 0, 0)
 
-        self.typeGroup = QGroupBox(self)
-        self.typeGroup.setTitle(translate("MidiFixtureSettings", "Fixture Type"))
-        self.typeGroup.setLayout(QFormLayout())
-        self.layout().addWidget(self.typeGroup, 0, 1)
+        self.type_group = QGroupBox(self)
+        self.type_group.setTitle(translate("MidiFixtureSettings", "Fixture Type"))
+        self.type_group.setLayout(QFormLayout())
+        self.layout().addWidget(self.type_group, 0, 1)
 
-        self.manufacturerCombo = QComboBox(self)
-        manuList = self.catalogue.get_manufacturer_list()
-        self.manufacturerCombo.addItem("(None)", None)
-        for manuID in manuList:
-            self.manufacturerCombo.addItem(manuList[manuID], manuID)
-        self.manufacturerCombo.currentIndexChanged.connect(self._update_list)
-        self.manufacturerGroup.layout().addWidget(self.manufacturerCombo)
+        self.type_manufacturer_combo = QComboBox(self)
+        manu_list = self.catalogue.get_manufacturer_list()
+        self.type_manufacturer_combo.addItem("(None)", None)
+        for manu_id in manu_list:
+            self.type_manufacturer_combo.addItem(manu_list[manu_id], manu_id)
+        self.type_manufacturer_combo.currentIndexChanged.connect(self._update_list)
+        self.manufacturer_group.layout().addWidget(self.type_manufacturer_combo)
 
-        self.mainTypeCombo = QComboBox(self)
-        typeList = self.catalogue.get_device_type_list()
-        self.mainTypeCombo.addItem("(None)", None)
-        for typeID in typeList:
-            self.mainTypeCombo.addItem(typeList[typeID], typeID)
-        self.mainTypeCombo.currentIndexChanged.connect(self._select_type)
-        self.typeGroup.layout().addRow(translate('MidiFixtureSettings', 'Type'), self.mainTypeCombo)
+        self.maintype_combo = QComboBox(self)
+        type_list = self.catalogue.get_device_type_list()
+        self.maintype_combo.addItem("(None)", None)
+        for type_id in type_list:
+            self.maintype_combo.addItem(type_list[type_id], type_id)
+        self.maintype_combo.currentIndexChanged.connect(self._select_type)
+        self.type_group.layout().addRow(translate('MidiFixtureSettings', 'Type'),
+                                        self.maintype_combo)
 
-        self.subTypeCombo = QComboBox(self)
-        self.subTypeCombo.addItem("(None)", None)
-        self.subTypeCombo.setEnabled(False)
-        self.typeGroup.layout().addRow(translate('MidiFixtureSettings', 'Sub-Type'), self.subTypeCombo)
+        self.subtype_combo = QComboBox(self)
+        self.subtype_combo.addItem("(None)", None)
+        self.subtype_combo.setEnabled(False)
+        self.type_group.layout().addRow(translate('MidiFixtureSettings', 'Sub-Type'),
+                                        self.subtype_combo)
 
-        self.fixtureList = QTreeWidget(self)
-        self.fixtureList.setHeaderLabels(["Manufacturer", "Type", "Subtype", "Model"])
-        self.fixtureList.header().setSectionResizeMode(QHeaderView.ResizeToContents)
-        self.fixtureList.setIndentation(0)
-        self.layout().addWidget(self.fixtureList, 1, 0, 1, 2)
+        self.fixture_list = QTreeWidget(self)
+        self.fixture_list.setHeaderLabels(["Manufacturer", "Type", "Subtype", "Model"])
+        self.fixture_list.header().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.fixture_list.setIndentation(0)
+        self.layout().addWidget(self.fixture_list, 1, 0, 1, 2)
 
         self.buttons = QDialogButtonBox(self)
         self.buttons.addButton(QDialogButtonBox.Cancel)
@@ -83,40 +88,39 @@ class FixtureSelectDialog(QDialog):
         self._update_list()
 
     def selected_fixture(self):
-        items = self.fixtureList.selectedItems()
+        items = self.fixture_list.selectedItems()
         return items[0].data(0, Qt.UserRole) if items else None
 
     def _update_list(self):
-        self.fixtureList.clear()
+        self.fixture_list.clear()
 
-        deviceList = self.catalogue.get_device_list(self.manufacturerCombo.currentData(),
-                                                    self.mainTypeCombo.currentData(),
-                                                    self.subTypeCombo.currentData())
-        for deviceID in deviceList:
+        device_list = self.catalogue.get_device_list(self.type_manufacturer_combo.currentData(),
+                                                     self.maintype_combo.currentData(),
+                                                     self.subtype_combo.currentData())
+        for device_id in device_list:
             item = QTreeWidgetItem()
-            item.setData(0, Qt.UserRole, deviceID)
-            item.setText(0, deviceList[deviceID]['manufacturer_name'])
-            item.setText(1, deviceList[deviceID]['type'])
-            item.setText(2, deviceList[deviceID]['subtype'])
-            item.setText(3, deviceList[deviceID]['name'])
-            self.fixtureList.addTopLevelItem(item)
+            item.setData(0, Qt.UserRole, device_id)
+            item.setText(0, device_list[device_id]['manufacturer_name'])
+            item.setText(1, device_list[device_id]['type'])
+            item.setText(2, device_list[device_id]['subtype'])
+            item.setText(3, device_list[device_id]['name'])
+            self.fixture_list.addTopLevelItem(item)
 
     def _select_type(self):
-        fType = self.mainTypeCombo.currentData()
+        selected_type = self.maintype_combo.currentData()
 
         # clear
-        if self.subTypeCombo.receivers(self.subTypeCombo.currentIndexChanged) > 0:
-            self.subTypeCombo.currentIndexChanged.disconnect()
-        self.subTypeCombo.clear()
-        self.subTypeCombo.addItem("(None)", None)
+        if self.subtype_combo.receivers(self.subtype_combo.currentIndexChanged) > 0:
+            self.subtype_combo.currentIndexChanged.disconnect()
+        self.subtype_combo.clear()
+        self.subtype_combo.addItem("(None)", None)
 
         # populate
-        if fType:
-            subTypeList = self.catalogue.get_device_type_list(fType)
-            for subTypeID in subTypeList:
-                self.subTypeCombo.addItem(subTypeList[subTypeID], subTypeID)
-            self.subTypeCombo.currentIndexChanged.connect(self._update_list)
+        if selected_type:
+            subtype_list = self.catalogue.get_device_type_list(selected_type)
+            for subtype_id in subtype_list:
+                self.subtype_combo.addItem(subtype_list[subtype_id], subtype_id)
+            self.subtype_combo.currentIndexChanged.connect(self._update_list)
 
-        self.subTypeCombo.setEnabled(bool(fType))
+        self.subtype_combo.setEnabled(bool(selected_type))
         self._update_list()
-

@@ -19,12 +19,14 @@
 
 from copy import copy
 import logging
-from midi_fixture_library import MIDIFixtureCatalogue
 
 # pylint: disable=no-name-in-module
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PyQt5.QtWidgets import QGridLayout, QGroupBox, QPushButton, QVBoxLayout
 
+from midi_fixture_library import MIDIFixtureCatalogue
+
+# pylint: disable=import-error
 from lisp.ui.qdelegates import RadioButtonDelegate, SpinBoxDelegate
 from lisp.ui.qviews import SimpleTableView
 from lisp.ui.settings.pages import SettingsPage
@@ -193,15 +195,17 @@ class MidiPatchModel(QAbstractTableModel):
 
     def data(self, index, role=Qt.DisplayRole):
         if index.isValid():
-            if role == Qt.DisplayRole or role == Qt.EditRole:
+            if role in (Qt.DisplayRole, Qt.EditRole):
                 if 'getter' in self.columns[index.column()]:
                     return self.columns[index.column()]['getter'](index.row())
                 return self.rows[index.row()][index.column()]
-            elif role == Qt.TextAlignmentRole:
+
+            if role == Qt.TextAlignmentRole:
                 return Qt.AlignCenter
-            elif role == Qt.CheckStateRole:
-                if self.flags(index) & Qt.ItemIsUserCheckable:
-                    return Qt.Checked if index.data(Qt.EditRole) == True else Qt.Unchecked
+
+            if role == Qt.CheckStateRole and self.flags(index) & Qt.ItemIsUserCheckable:
+                return Qt.Checked if index.data(Qt.EditRole) else Qt.Unchecked
+
         return None
 
     def getIndex(self, row, col_id):
@@ -231,7 +235,7 @@ class MidiPatchModel(QAbstractTableModel):
             if not disable_custom_setter and 'setter' in self.columns[index.column()]:
                 value = self.columns[index.column()]['setter'](index.row(), value)
 
-            if role == Qt.DisplayRole or role == Qt.EditRole:
+            if role in (Qt.DisplayRole, Qt.EditRole):
                 self.rows[index.row()][index.column()] = value
                 self.dataChanged.emit(self.index(index.row(), 0),
                                       self.index(index.row(), index.column()),
@@ -239,7 +243,7 @@ class MidiPatchModel(QAbstractTableModel):
                 return True
 
             if role == Qt.CheckStateRole:
-                self.rows[index.row()][index.column()] = True if value == Qt.Checked else False
+                self.rows[index.row()][index.column()] = value == Qt.Checked
                 self.dataChanged.emit(self.index(index.row(), 0),
                                       self.index(index.row(), index.column()),
                                       [Qt.CheckStateRole])
@@ -351,7 +355,7 @@ class MidiPatchModel(QAbstractTableModel):
             })
             if row[self.column_map['default_indicator']]:
                 default_patch = row[self.column_map['patch_id']]
-            if row[self.column_map['dca_indicator']] == True:
+            if row[self.column_map['dca_indicator']]:
                 dca_device = row[self.column_map['patch_id']]
 
         return {
@@ -377,7 +381,7 @@ class MidiPatchModel(QAbstractTableModel):
                               None,
                               None,
                               patch['patch_id'] == config['default_patch'],
-                              -1 if not fixture_profile['dcaCapable'] else patch['patch_id'] == config['dca_device']])
+                              -1 if not fixture_profile['dcaCapable'] else patch['patch_id'] == config['dca_device']]) # pylint: disable=line-too-long
             self.address_space.fill_block(patch['midi_channel'] + 1, fixture_profile['width'])
         self.endInsertRows()
 

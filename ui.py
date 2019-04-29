@@ -1,7 +1,9 @@
 
+# pylint: disable=no-name-in-module
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QStyledItemDelegate
 
+# pylint: disable=import-error
 from lisp.ui.qdelegates import RadioButtonDelegate
 
 class LabelDelegate(QStyledItemDelegate):
