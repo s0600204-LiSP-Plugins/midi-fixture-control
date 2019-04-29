@@ -19,12 +19,12 @@
 
 from copy import copy
 import logging
+from midi_fixture_library import MIDIFixtureCatalogue
 
 # pylint: disable=no-name-in-module
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PyQt5.QtWidgets import QGridLayout, QGroupBox, QPushButton, QVBoxLayout
 
-from lisp.plugins import get_plugin
 from lisp.ui.qdelegates import RadioButtonDelegate, SpinBoxDelegate
 from lisp.ui.qviews import SimpleTableView
 from lisp.ui.settings.pages import SettingsPage
@@ -123,7 +123,6 @@ class MidiFixtureSettings(SettingsPage):
         for key, value in self.patchListModel.serialise().items():
             conf[key] = value
         return conf
-        #get_plugin('MidiFixtureControl').WriteSessionConfig(conf)
 
     def loadSettings(self, settings):
         self.patchListModel.deserialise(settings)
@@ -135,6 +134,7 @@ class MidiPatchModel(QAbstractTableModel):
     def __init__(self):
         super().__init__()
         self.address_space = MidiAddressSpace()
+        self.catalogue = MIDIFixtureCatalogue()
         self.patch_count = 0
         self.rows = []
         self.columns = [
@@ -209,22 +209,18 @@ class MidiPatchModel(QAbstractTableModel):
         return self.createIndex(row, self.column_map[col_id])
 
     def _getMidiAddressEnd(self, row):
-        library = get_plugin('MidiFixtureControl').get_library()
-
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
         fixture_address = self.data(self.getIndex(row, 'address'))
-        fixture_profile = library.get_device_profile(fixture_id)
+        fixture_profile = self.catalogue.get_device_description(fixture_id)
 
         return fixture_profile['width'] + fixture_address - 1
 
     def _getFixtureLabel(self, row):
-        library = get_plugin('MidiFixtureControl').get_library()
-
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
-        fixture_profile = library.get_device_profile(fixture_id)
+        fixture_profile = self.catalogue.get_device_description(fixture_id)
 
         return '{manu} {model}'.format_map({
-            'manu': library.get_manufacturer_list()[fixture_profile['manufacturer']],
+            'manu': fixture_profile['manufacturer_name'],
             'model': fixture_profile['name']
         })
 
@@ -258,15 +254,12 @@ class MidiPatchModel(QAbstractTableModel):
         return False
 
     def appendPatch(self, fixture_id):
-        library = get_plugin('MidiFixtureControl').get_library()
-        fixture_profile = library.get_device_profile(fixture_id)
-
+        fixture_profile = self.catalogue.get_device_description(fixture_id)
         fixture_width = fixture_profile['width']
         fixture_address = self.address_space.find_block(1, fixture_width, loop=False)
         if fixture_address == -1:
             return
 
-        supports_dca = 'dcaAssign' in fixture_profile['commands']
         set_dca = True
         for r in range(self.rowCount()):
             if self.flags(self.getIndex(r, 'dca_indicator')) & Qt.ItemIsUserCheckable:
@@ -283,21 +276,20 @@ class MidiPatchModel(QAbstractTableModel):
                           None,
                           None,
                           self.rowCount() == 0,
-                          -1 if not supports_dca else set_dca])
+                          -1 if not fixture_profile['dcaCapable'] else set_dca])
         self.endInsertRows()
         self.patch_count += 1
 
     def amendPatch(self, row, new_fixture_id):
         if row == -1 or row >= self.rowCount():
             return
-        library = get_plugin('MidiFixtureControl').get_library()
         fixture_address = self.data(self.getIndex(row, 'address'))
 
         old_fixture_id = self.data(self.getIndex(row, 'fixture_id'))
-        old_fixture_profile = library.get_device_profile(old_fixture_id)
+        old_fixture_profile = self.catalogue.get_device_description(old_fixture_id)
         old_fixture_width = old_fixture_profile['width']
 
-        new_fixture_profile = library.get_device_profile(new_fixture_id)
+        new_fixture_profile = self.catalogue.get_device_description(new_fixture_id)
         new_fixture_width = new_fixture_profile['width']
 
         new_fixture_address = self.address_space.find_block(fixture_address,
@@ -322,9 +314,8 @@ class MidiPatchModel(QAbstractTableModel):
         if row == -1 or row >= self.rowCount():
             return
 
-        library = get_plugin('MidiFixtureControl').get_library()
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
-        fixture_profile = library.get_device_profile(fixture_id)
+        fixture_profile = self.catalogue.get_device_description(fixture_id)
         fixture_address = self.data(self.getIndex(row, 'address'))
 
         self.address_space.empty_block(fixture_address, fixture_profile['width'])
@@ -376,19 +367,17 @@ class MidiPatchModel(QAbstractTableModel):
             logger.error('Attempting to deserialise out of sequence.')
             return
 
-        library = get_plugin('MidiFixtureControl').get_library()
         self.patch_count = config['patch_count']
         self.beginInsertRows(QModelIndex(), -1, -1)
         for patch in config['patches']:
-            fixture_profile = library.get_device_profile(patch['fixture_id'])
-            supports_dca = 'dcaAssign' in fixture_profile['commands']
+            fixture_profile = self.catalogue.get_device_description(patch['fixture_id'])
             self.rows.append([patch['patch_id'],
                               patch['fixture_id'],
                               patch['midi_channel'] + 1,
                               None,
                               None,
                               patch['patch_id'] == config['default_patch'],
-                              -1 if not supports_dca else patch['patch_id'] == config['dca_device']])
+                              -1 if not fixture_profile['dcaCapable'] else patch['patch_id'] == config['dca_device']])
             self.address_space.fill_block(patch['midi_channel'] + 1, fixture_profile['width'])
         self.endInsertRows()
 
@@ -397,9 +386,8 @@ class MidiPatchModel(QAbstractTableModel):
         old_address = self.data(self.getIndex(row, 'address'))
         new_address = value
 
-        library = get_plugin('MidiFixtureControl').get_library()
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
-        fixture_profile = library.get_device_profile(fixture_id)
+        fixture_profile = self.catalogue.get_device_description(fixture_id)
         fixture_width = fixture_profile['width']
 
         new_address = self.address_space.find_block(new_address,

@@ -17,8 +17,10 @@
 # You should have received a copy of the GNU General Public License
 # along with Linux Show Player.  If not, see <http://www.gnu.org/licenses/>.
 
+import logging
+
 from PyQt5.QtCore import QT_TRANSLATE_NOOP
-from midi_fixture_library import MIDIFixtureLibrary
+from midi_fixture_library import MIDIFixture, FixtureWidthError
 
 from lisp.core.plugin import Plugin
 from lisp.cues.cue_factory import CueFactory
@@ -28,6 +30,8 @@ from lisp.ui.ui_utils import translate
 from .fixture_command_cue import FixtureCommandCue
 from .midi_fixture_settings import MidiFixtureSettings
 
+logger = logging.getLogger(__name__) # pylint: disable=invalid-name
+
 class MidiFixtureControl(Plugin):
     """Provides the ability to control a pre-identified MIDI fixture"""
 
@@ -36,11 +40,8 @@ class MidiFixtureControl(Plugin):
     Depends = ('Midi',)
     Description = 'Provides the ability to control a pre-identified MIDI fixture'
 
-    library_reference = None
-
     def __init__(self, app):
         super().__init__(app)
-        self.library_reference = MIDIFixtureLibrary()
 
         # Register the settings widget
         SessionConfigurationDialog.registerSettingsPage(
@@ -52,8 +53,42 @@ class MidiFixtureControl(Plugin):
             FixtureCommandCue, QT_TRANSLATE_NOOP("CueCategory", "Integration cues")
         )
 
-    def attach_session_config(self):
-        print(self.SessionConfig)
+        self.fixtures = {}
 
-    def get_library(self):
-        return self.library_reference
+    def _on_session_loaded(self):
+        self._on_session_config_altered(self.SessionConfig)
+
+    def get_profile(self, patch_id=None):
+        if patch_id is None:
+            if self.SessionConfig['default_patch']:
+                return self.fixtures[self.SessionConfig['default_patch']]
+            return None
+
+        if patch_id not in self.fixtures:
+            logger.warning('Patch ID "%s" not in prepped fixtures.', {patch_id})
+            return None
+
+        return self.fixtures[patch_id]
+
+    def _on_session_config_altered(self, args):
+        if 'patches' in args:
+            for patch in args['patches']:
+                patch_id = patch['patch_id']
+
+                if patch_id not in self.fixtures:
+                    self.fixtures[patch_id] = MIDIFixture(patch['fixture_id'], patch['midi_channel'])
+                    continue
+
+                if patch['fixture_id'] != self.fixtures[patch_id].fixture_id:
+                    try:
+                        self.fixtures[patch_id].change_fixture(patch['fixture_id'])
+
+                    except FixtureWidthError:
+                        if patch['midi_channel'] != self.fixtures[patch_id].midi_channel:
+                            self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])
+                            self.fixtures[patch_id].change_fixture(patch['fixture_id'])
+                        else:
+                            raise
+
+                if patch['midi_channel'] != self.fixtures[patch_id].midi_channel:
+                    self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])

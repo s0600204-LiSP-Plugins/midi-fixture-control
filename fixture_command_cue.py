@@ -47,18 +47,8 @@ class FixtureCommandCue(Cue):
         if not self.fixture_command or not self.fixture_command['patch_id']:
             return False
 
-        plugin_config = get_plugin('MidiFixtureControl').SessionConfig
-
-        patch_details = None
-        for patch in plugin_config['patches']:
-            if patch['patch_id'] == self.fixture_command['patch_id']:
-                patch_details = patch
-                break
-
-        library = get_plugin('MidiFixtureControl').get_library()
-        midi_messages = library.build_device_command(patch_details['fixture_id'],
-                                                     patch_details['midi_channel'],
-                                                     self.fixture_command['command'],
+        profile = get_plugin('MidiFixtureControl').get_profile(self.fixture_command['patch_id'])
+        midi_messages = profile.build_device_command(self.fixture_command['command'],
                                                      self.fixture_command['args'])
 
         for dict_message in midi_messages:
@@ -73,21 +63,22 @@ class FixtureCommandCueSettings(SettingsPage):
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
-        library = get_plugin('MidiFixtureControl').get_library()
         self.setLayout(QFormLayout())
 
-        def _build_patch_label(patch):
-            fixture_profile = library.get_device_profile(patch['fixture_id'])
-            return '{manufacturer} {model} (@{channel})'.format_map({
-                'manufacturer': library.get_manufacturer_list()[fixture_profile['manufacturer']],
-                'model': fixture_profile['name'],
-                'channel': patch['midi_channel'] + 1})
+        def _build_patch_label(profile):
+            return '{manufacturer} {model} (@{channel})'.format_map(
+                {
+                    'manufacturer': profile.manufacturer_name,
+                    'model': profile.name,
+                    'channel': profile.midi_channel + 1
+                })
 
         # Dropdown of available fixture patches
         self.patch_combo = QComboBox(self)
-        module_config = get_plugin('MidiFixtureControl').SessionConfig
-        for patch in module_config['patches']:
-            self.patch_combo.addItem(_build_patch_label(patch), patch['patch_id'])
+        plugin = get_plugin('MidiFixtureControl')
+        for patch_definition in plugin.SessionConfig['patches']:
+            patch_id = patch_definition['patch_id']
+            self.patch_combo.addItem(_build_patch_label(plugin.get_profile(patch_id)), patch_id)
         self.patch_combo.currentIndexChanged.connect(self._select_patch)
         self.layout().addRow('Patched Fixture:', self.patch_combo)
 
@@ -108,10 +99,10 @@ class FixtureCommandCueSettings(SettingsPage):
         self.command_combo.clear()
 
         # Get profile
-        fixture_profile = self._get_fixture_profile()
+        fixture_profile = self._get_current_fixture_profile()
 
         # Supply new command list
-        for cmd, details in fixture_profile['commands'].items():
+        for cmd, details in fixture_profile.commands().items():
             self.command_combo.addItem(details['caption'], cmd)
         self.command_combo.currentIndexChanged.connect(self._select_command)
 
@@ -124,7 +115,7 @@ class FixtureCommandCueSettings(SettingsPage):
 
         # Supply arg sources
         self.argument_sources = {}
-        for arg_name, arg_definition in fixture_profile['parameters'].items():
+        for arg_name, arg_definition in fixture_profile.parameters().items():
             if arg_name in self.argument_sources:
                 continue
 
@@ -146,8 +137,9 @@ class FixtureCommandCueSettings(SettingsPage):
         self.command_combo.currentIndexChanged.emit(0)
 
     def _select_command(self, _):
-        current_command_parameters = self._get_current_command_parameters()
-        fixture_profile = self._get_fixture_profile()
+        fixture_profile = self._get_current_fixture_profile()
+        parameter_definitions = fixture_profile.parameters()
+        parameter_list = self._get_current_parameter_list()
 
         # Hide all currently displayed argument-receiving widgets
         for arg_widget in self.argument_sources.values():
@@ -157,10 +149,11 @@ class FixtureCommandCueSettings(SettingsPage):
                 arg_widget.hide()
 
         # Show appropriate argument-receiving widgets, and set to defaults
-        for arg_name in current_command_parameters:
+        for arg_name in parameter_list:
             arg_widget = self.argument_sources[arg_name]
             arg_widget.show()
-            self.layout().addRow(fixture_profile['parameters'][arg_name]['caption'], arg_widget)
+            self.layout().addRow(parameter_definitions[arg_name]['caption'], arg_widget)
+
             if isinstance(arg_widget, QSpinBox):
                 if arg_widget.receivers(arg_widget.valueChanged) > 0:
                     arg_widget.valueChanged.disconnect()
@@ -177,15 +170,14 @@ class FixtureCommandCueSettings(SettingsPage):
         conditional = []
         # Give argument-receiving widgets their actual values.
         # This must be done *after* setting to defaults.
-        for arg_name, arg_definition_specific in current_command_parameters.items():
-            arg_definition = fixture_profile['parameters'][arg_name]
+        for arg_name, values in parameter_list.items():
+            definition = parameter_definitions[arg_name]
 
-            if 'valuesConditionalOn' in arg_definition:
-                if arg_definition['valuesConditionalOn'] not in conditional:
-                    conditional.append(arg_definition['valuesConditionalOn'])
+            if 'valuesConditionalOn' in definition:
+                if definition['valuesConditionalOn'] not in conditional:
+                    conditional.append(definition['valuesConditionalOn'])
                 continue
 
-            values = arg_definition_specific.get('values', arg_definition.get('values', []))
             arg_widget = self.argument_sources[arg_name]
             if isinstance(arg_widget, QSpinBox):
                 limit = (limit for limit in values)
@@ -226,9 +218,9 @@ class FixtureCommandCueSettings(SettingsPage):
             "command": self.command_combo.currentData(),
             "args": {}
         }
-        current_command_parameters = self._get_current_command_parameters()
+        parameter_list = self._get_current_parameter_list()
 
-        for arg_name in current_command_parameters.keys():
+        for arg_name in parameter_list.keys():
             conf["args"][arg_name] = self._get_value_from_argument_widget(arg_name)
 
         return {'fixture_command': conf}
@@ -275,14 +267,14 @@ class FixtureCommandCueSettings(SettingsPage):
         return ""
 
     def _change_dependant_argument(self, transmitter_name):
-        current_command_parameters = self._get_current_command_parameters()
+        fixture_profile = self._get_current_fixture_profile()
+        parameter_definitions = fixture_profile.parameters()
+        parameter_list = self._get_current_parameter_list()
         current_value = self._get_value_from_argument_widget(transmitter_name)
-        fixture_profile = self._get_fixture_profile()
 
-        for arg_name, arg_definition_specific in current_command_parameters.items():
-            arg_definition = fixture_profile['parameters'][arg_name]
-            if 'valuesConditionalOn' in arg_definition and arg_definition['valuesConditionalOn'] == transmitter_name:
-                values = arg_definition_specific.get('values', arg_definition.get('values', {}))
+        for arg_name, values in parameter_list.items():
+            definition = parameter_definitions[arg_name]
+            if 'valuesConditionalOn' in definition and definition['valuesConditionalOn'] == transmitter_name:
                 arg_widget = self.argument_sources[arg_name]
 
                 if isinstance(arg_widget, QSpinBox):
@@ -295,26 +287,13 @@ class FixtureCommandCueSettings(SettingsPage):
 
                 # todo: handle other potential cases
 
-    def _get_fixture_profile(self):
-        library = get_plugin('MidiFixtureControl').get_library()
-        plugin_config = get_plugin('MidiFixtureControl').SessionConfig
-        patch_id = self.patch_combo.currentData() or plugin_config['default_patch']
+    def _get_current_fixture_profile(self):
+        return get_plugin('MidiFixtureControl').get_profile(self.patch_combo.currentData())
 
-        fixture_id = None
-        for patch in plugin_config['patches']:
-            if patch['patch_id'] == patch_id:
-                fixture_id = patch['fixture_id']
-                break
-
-        if not fixture_id:
-            return None
-
-        return library.get_device_profile(fixture_id)
-
-    def _get_current_command_parameters(self):
-        fixture_profile = self._get_fixture_profile()
+    def _get_current_parameter_list(self):
+        fixture_profile = self._get_current_fixture_profile()
         if fixture_profile:
-            return fixture_profile['commands'][self.command_combo.currentData()]['parameters']
+            return fixture_profile.parameter_values(self.command_combo.currentData())
         return {}
 
 CueSettingsRegistry().add(FixtureCommandCueSettings, FixtureCommandCue)

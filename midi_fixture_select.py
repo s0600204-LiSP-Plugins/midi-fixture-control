@@ -17,10 +17,11 @@
 # You should have received a copy of the GNU General Public License
 # along with Linux Show Player.  If not, see <http://www.gnu.org/licenses/>.
 
+from midi_fixture_library import MIDIFixtureCatalogue
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialog, QGridLayout, QVBoxLayout, QFormLayout, QGroupBox, QComboBox, QTreeWidget, QTreeWidgetItem, QDialogButtonBox, QHeaderView
 
-from lisp.plugins import get_plugin
 from lisp.ui.ui_utils import translate
 
 class FixtureSelectDialog(QDialog):
@@ -30,7 +31,7 @@ class FixtureSelectDialog(QDialog):
 
         self.setWindowTitle(translate('MidiFixtureSettings', 'MIDI Fixture Selection'))
         self.setMinimumSize(600, 400)
-        library = get_plugin('MidiFixtureControl').get_library()
+        self.catalogue = MIDIFixtureCatalogue()
 
         self.setLayout(QGridLayout())
 
@@ -46,7 +47,7 @@ class FixtureSelectDialog(QDialog):
         self.layout().addWidget(self.typeGroup, 0, 1)
 
         self.manufacturerCombo = QComboBox(self)
-        manuList = library.get_manufacturer_list()
+        manuList = self.catalogue.get_manufacturer_list()
         self.manufacturerCombo.addItem("(None)", None)
         for manuID in manuList:
             self.manufacturerCombo.addItem(manuList[manuID], manuID)
@@ -54,7 +55,7 @@ class FixtureSelectDialog(QDialog):
         self.manufacturerGroup.layout().addWidget(self.manufacturerCombo)
 
         self.mainTypeCombo = QComboBox(self)
-        typeList = library.get_device_type_list()
+        typeList = self.catalogue.get_device_type_list()
         self.mainTypeCombo.addItem("(None)", None)
         for typeID in typeList:
             self.mainTypeCombo.addItem(typeList[typeID], typeID)
@@ -86,12 +87,11 @@ class FixtureSelectDialog(QDialog):
         return items[0].data(0, Qt.UserRole) if items else None
 
     def _update_list(self):
-        library = get_plugin('MidiFixtureControl').get_library()
         self.fixtureList.clear()
 
-        deviceList = library.get_device_list(self.manufacturerCombo.currentData(),
-                                             self.mainTypeCombo.currentData(),
-                                             self.subTypeCombo.currentData())
+        deviceList = self.catalogue.get_device_list(self.manufacturerCombo.currentData(),
+                                                    self.mainTypeCombo.currentData(),
+                                                    self.subTypeCombo.currentData())
         for deviceID in deviceList:
             item = QTreeWidgetItem()
             item.setData(0, Qt.UserRole, deviceID)
@@ -102,7 +102,6 @@ class FixtureSelectDialog(QDialog):
             self.fixtureList.addTopLevelItem(item)
 
     def _select_type(self):
-        library = get_plugin('MidiFixtureControl').get_library()
         fType = self.mainTypeCombo.currentData()
 
         # clear
@@ -113,7 +112,7 @@ class FixtureSelectDialog(QDialog):
 
         # populate
         if fType:
-            subTypeList = library.get_device_type_list(fType)
+            subTypeList = self.catalogue.get_device_type_list(fType)
             for subTypeID in subTypeList:
                 self.subTypeCombo.addItem(subTypeList[subTypeID], subTypeID)
             self.subTypeCombo.currentIndexChanged.connect(self._update_list)
