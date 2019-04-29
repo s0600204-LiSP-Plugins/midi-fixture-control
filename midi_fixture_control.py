@@ -57,8 +57,8 @@ class MidiFixtureControl(Plugin):
 
         self.fixtures = {}
 
-    def _on_session_loaded(self):
-        self._on_session_config_altered(self.SessionConfig)
+    def _on_session_initialised(self):
+        self._on_session_config_altered(None)
 
     def get_profile(self, patch_id=None):
         if patch_id is None:
@@ -72,26 +72,25 @@ class MidiFixtureControl(Plugin):
 
         return self.fixtures[patch_id]
 
-    def _on_session_config_altered(self, args):
-        if 'patches' in args:
-            for patch in args['patches']:
-                patch_id = patch['patch_id']
+    def _on_session_config_altered(self, _):
+        for patch in self.SessionConfig['patches']:
+            patch_id = patch['patch_id']
 
-                if patch_id not in self.fixtures:
-                    self.fixtures[patch_id] = MIDIFixture(patch['fixture_id'],
-                                                          patch['midi_channel'])
-                    continue
+            if patch_id not in self.fixtures:
+                self.fixtures[patch_id] = MIDIFixture(patch['fixture_id'],
+                                                      patch['midi_channel'])
+                continue
 
-                if patch['fixture_id'] != self.fixtures[patch_id].fixture_id:
-                    try:
+            if patch['fixture_id'] != self.fixtures[patch_id].fixture_id:
+                try:
+                    self.fixtures[patch_id].change_fixture(patch['fixture_id'])
+
+                except FixtureWidthError:
+                    if patch['midi_channel'] != self.fixtures[patch_id].midi_channel:
+                        self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])
                         self.fixtures[patch_id].change_fixture(patch['fixture_id'])
+                    else:
+                        raise
 
-                    except FixtureWidthError:
-                        if patch['midi_channel'] != self.fixtures[patch_id].midi_channel:
-                            self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])
-                            self.fixtures[patch_id].change_fixture(patch['fixture_id'])
-                        else:
-                            raise
-
-                if patch['midi_channel'] != self.fixtures[patch_id].midi_channel:
-                    self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])
+            if patch['midi_channel'] != self.fixtures[patch_id].midi_channel:
+                self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])
