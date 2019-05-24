@@ -28,12 +28,11 @@ from midi_fixture_library import MIDIFixtureCatalogue
 
 # pylint: disable=import-error
 from lisp.ui.qdelegates import SpinBoxDelegate
-from lisp.ui.qviews import SimpleTableView
 from lisp.ui.settings.pages import SettingsPage
 from lisp.ui.ui_utils import translate
 
 from .midi_fixture_select import FixtureSelectDialog
-from .ui import LabelDelegate, RadioButtonDelegate, RadioButtonHidableDelegate
+from .ui import LabelDelegate, RadioButtonDelegate, RadioButtonHidableDelegate, SimpleTableView
 
 logger = logging.getLogger(__name__) # pylint: disable=invalid-name
 
