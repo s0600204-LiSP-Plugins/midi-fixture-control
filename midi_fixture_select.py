@@ -50,7 +50,7 @@ class FixtureSelectDialog(QDialog):
         self.layout().addWidget(self.type_group, 0, 1)
 
         self.type_manufacturer_combo = QComboBox(self)
-        manu_list = self.catalogue.get_manufacturer_list()
+        manu_list = self.catalogue.list_manufacturers()
         self.type_manufacturer_combo.addItem("(None)", None)
         for manu_id in manu_list:
             self.type_manufacturer_combo.addItem(manu_list[manu_id], manu_id)
@@ -58,7 +58,7 @@ class FixtureSelectDialog(QDialog):
         self.manufacturer_group.layout().addWidget(self.type_manufacturer_combo)
 
         self.maintype_combo = QComboBox(self)
-        type_list = self.catalogue.get_device_type_list()
+        type_list = self.catalogue.list_device_types()
         self.maintype_combo.addItem("(None)", None)
         for type_id in type_list:
             self.maintype_combo.addItem(type_list[type_id], type_id)
@@ -94,9 +94,9 @@ class FixtureSelectDialog(QDialog):
     def _update_list(self):
         self.fixture_list.clear()
 
-        device_list = self.catalogue.get_device_list(self.type_manufacturer_combo.currentData(),
-                                                     self.maintype_combo.currentData(),
-                                                     self.subtype_combo.currentData())
+        device_list = self.catalogue.list_devices(self.type_manufacturer_combo.currentData(),
+                                                  self.maintype_combo.currentData(),
+                                                  self.subtype_combo.currentData())
         for device_id in device_list:
             item = QTreeWidgetItem()
             item.setData(0, Qt.UserRole, device_id)
@@ -117,7 +117,7 @@ class FixtureSelectDialog(QDialog):
 
         # populate
         if selected_type:
-            subtype_list = self.catalogue.get_device_type_list(selected_type)
+            subtype_list = self.catalogue.list_device_types(selected_type)
             for subtype_id in subtype_list:
                 self.subtype_combo.addItem(subtype_list[subtype_id], subtype_id)
             self.subtype_combo.currentIndexChanged.connect(self._update_list)

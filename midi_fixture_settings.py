@@ -214,13 +214,13 @@ class MidiPatchModel(QAbstractTableModel):
     def _getMidiAddressEnd(self, row):
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
         fixture_address = self.data(self.getIndex(row, 'address'))
-        fixture_profile = self.catalogue.get_device_description(fixture_id)
+        fixture_profile = self.catalogue.device_description(fixture_id)
 
         return fixture_profile['width'] + fixture_address - 1
 
     def _getFixtureLabel(self, row):
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
-        fixture_profile = self.catalogue.get_device_description(fixture_id)
+        fixture_profile = self.catalogue.device_description(fixture_id)
 
         return '{manu} {model}'.format_map({
             'manu': fixture_profile['manufacturer_name'],
@@ -257,7 +257,7 @@ class MidiPatchModel(QAbstractTableModel):
         return False
 
     def appendPatch(self, fixture_id):
-        fixture_profile = self.catalogue.get_device_description(fixture_id)
+        fixture_profile = self.catalogue.device_description(fixture_id)
         fixture_width = fixture_profile['width']
         fixture_address = self.address_space.find_block(1, fixture_width, loop=False)
         if fixture_address == -1:
@@ -289,10 +289,10 @@ class MidiPatchModel(QAbstractTableModel):
         fixture_address = self.data(self.getIndex(row, 'address'))
 
         old_fixture_id = self.data(self.getIndex(row, 'fixture_id'))
-        old_fixture_profile = self.catalogue.get_device_description(old_fixture_id)
+        old_fixture_profile = self.catalogue.device_description(old_fixture_id)
         old_fixture_width = old_fixture_profile['width']
 
-        new_fixture_profile = self.catalogue.get_device_description(new_fixture_id)
+        new_fixture_profile = self.catalogue.device_description(new_fixture_id)
         new_fixture_width = new_fixture_profile['width']
 
         new_fixture_address = self.address_space.find_block(fixture_address,
@@ -318,7 +318,7 @@ class MidiPatchModel(QAbstractTableModel):
             return
 
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
-        fixture_profile = self.catalogue.get_device_description(fixture_id)
+        fixture_profile = self.catalogue.device_description(fixture_id)
         fixture_address = self.data(self.getIndex(row, 'address'))
 
         self.address_space.empty_block(fixture_address, fixture_profile['width'])
@@ -373,7 +373,7 @@ class MidiPatchModel(QAbstractTableModel):
         self.patch_count = config['patch_count']
         self.beginInsertRows(QModelIndex(), -1, -1)
         for patch in config['patches']:
-            fixture_profile = self.catalogue.get_device_description(patch['fixture_id'])
+            fixture_profile = self.catalogue.device_description(patch['fixture_id'])
             self.rows.append([patch['patch_id'],
                               patch['fixture_id'],
                               patch['midi_channel'] + 1,
@@ -390,7 +390,7 @@ class MidiPatchModel(QAbstractTableModel):
         new_address = value
 
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
-        fixture_profile = self.catalogue.get_device_description(fixture_id)
+        fixture_profile = self.catalogue.device_description(fixture_id)
         fixture_width = fixture_profile['width']
 
         new_address = self.address_space.find_block(new_address,
