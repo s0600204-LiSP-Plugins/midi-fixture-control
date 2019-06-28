@@ -140,7 +140,8 @@ class MidiPatchModel(QAbstractTableModel):
 
     def __init__(self):
         super().__init__()
-        self.address_space = MidiAddressSpace()
+        self.channel_address_space = MidiAddressSpace(True)
+        self.deviceid_address_space = MidiAddressSpace(False)
         self.catalogue = MIDIFixtureCatalogue()
         self.patch_count = 0
         self.rows = []
@@ -266,7 +267,7 @@ class MidiPatchModel(QAbstractTableModel):
     def appendPatch(self, fixture_id):
         fixture_profile = self.catalogue.device_description(fixture_id)
         fixture_width = fixture_profile['width']
-        fixture_address = self.address_space.find_block(1, fixture_width, loop=False)
+        fixture_address = self.channel_address_space.find_block(1, fixture_width, loop=False)
         if fixture_address == -1:
             return
 
@@ -276,7 +277,7 @@ class MidiPatchModel(QAbstractTableModel):
                 set_dca = False
                 break
 
-        self.address_space.fill_block(fixture_address, fixture_width)
+        self.channel_address_space.fill_block(fixture_address, fixture_width)
 
         row = self.rowCount() - 1
         self.beginInsertRows(QModelIndex(), row, row)
@@ -302,9 +303,9 @@ class MidiPatchModel(QAbstractTableModel):
         new_fixture_profile = self.catalogue.device_description(new_fixture_id)
         new_fixture_width = new_fixture_profile['width']
 
-        new_fixture_address = self.address_space.find_block(fixture_address,
-                                                            new_fixture_width,
-                                                            existing=[fixture_address, old_fixture_width]) # pylint: disable=line-too-long
+        new_fixture_address = self.channel_address_space.find_block(fixture_address,
+                                                                    new_fixture_width,
+                                                                    existing=[fixture_address, old_fixture_width]) # pylint: disable=line-too-long
         if new_fixture_address == -1:
             logger.warning("No space for this device!")
             return
@@ -312,8 +313,8 @@ class MidiPatchModel(QAbstractTableModel):
         self.setData(self.getIndex(row, 'fixture_id'), new_fixture_id)
 
         if fixture_address != new_fixture_address or old_fixture_width != new_fixture_width:
-            self.address_space.empty_block(fixture_address, old_fixture_width)
-            self.address_space.fill_block(new_fixture_address, new_fixture_width)
+            self.channel_address_space.empty_block(fixture_address, old_fixture_width)
+            self.channel_address_space.fill_block(new_fixture_address, new_fixture_width)
 
         if old_fixture_profile['dcaCapable'] != new_fixture_profile['dcaCapable']:
             if new_fixture_profile['dcaCapable']:
@@ -347,7 +348,7 @@ class MidiPatchModel(QAbstractTableModel):
         fixture_profile = self.catalogue.device_description(fixture_id)
         fixture_address = self.data(self.getIndex(row, 'address'))
 
-        self.address_space.empty_block(fixture_address, fixture_profile['width'])
+        self.channel_address_space.empty_block(fixture_address, fixture_profile['width'])
 
         # Check if default device or chosen dca
         formerly_default = self.data(self.getIndex(row, 'default_indicator'))
@@ -414,7 +415,7 @@ class MidiPatchModel(QAbstractTableModel):
                               None,
                               patch['patch_id'] == config['default_patch'],
                               -1 if not fixture_profile['dcaCapable'] else patch['patch_id'] == config['dca_device']]) # pylint: disable=line-too-long
-            self.address_space.fill_block(patch['midi_channel'] + 1, fixture_profile['width'])
+            self.channel_address_space.fill_block(patch['midi_channel'] + 1, fixture_profile['width'])
         self.endInsertRows()
 
     def _updateMidiAddress(self, row, value):
@@ -426,28 +427,32 @@ class MidiPatchModel(QAbstractTableModel):
         fixture_profile = self.catalogue.device_description(fixture_id)
         fixture_width = fixture_profile['width']
 
-        new_address = self.address_space.find_block(new_address,
-                                                    fixture_width,
-                                                    existing=[old_address, fixture_width])
+        new_address = self.channel_address_space.find_block(new_address,
+                                                            fixture_width,
+                                                            existing=[old_address, fixture_width])
         if new_address == -1:
             return old_address
 
-        self.address_space.empty_block(old_address, fixture_width)
-        self.address_space.fill_block(new_address, fixture_width)
+        self.channel_address_space.empty_block(old_address, fixture_width)
+        self.channel_address_space.fill_block(new_address, fixture_width)
         return new_address
+
 
 class MidiAddressSpace:
     '''
 
     MIDI Channels 1-16 (NOT 0-15)
+    or
+    MIDI Device ID 1-111
     '''
-    def __init__(self):
-        self.address_space = [False for i in range(16)]
+    def __init__(self, is_channel_space):
+        self._upper_limit = 16 if is_channel_space else 111
+        self.address_space = [False for i in range(self._upper_limit)]
 
-    def fill_block(self, start, length):
-        if start < 1 or start > 16 or \
-            length < 1 or length > 16 or \
-            start + length > 17:
+    def fill_block(self, start, length=1):
+        if start < 1 or start > self._upper_limit or \
+            length < 1 or length > self._upper_limit or \
+            start + length > self._upper_limit + 1:
             return False
         start -= 1
         working_space = copy(self.address_space)
@@ -460,10 +465,10 @@ class MidiAddressSpace:
         self.address_space = working_space
         return True
 
-    def empty_block(self, start, length):
-        if start < 1 or start > 16 or \
-            length < 1 or length > 16 or \
-            start + length > 17:
+    def empty_block(self, start, length=1):
+        if start < 1 or start > self._upper_limit or \
+            length < 1 or length > self._upper_limit or \
+            start + length > self._upper_limit + 1:
             return False
         start -= 1
         working_space = copy(self.address_space)
@@ -476,25 +481,25 @@ class MidiAddressSpace:
         self.address_space = working_space
         return True
 
-    def find_block(self, start, length, existing=False, loop=False):
-        if start < 1 or start > 16 or length < 1 or length > 16:
+    def find_block(self, start, length=1, existing=False, loop=False):
+        if start < 1 or start > self._upper_limit or length < 1 or length > self._upper_limit:
             return -1
         start -= 1
         working_space = copy(self.address_space)
 
         if existing:
-            ex_start = max(1, min(existing[0], 16)) - 1
-            ex_end = max(1, min(existing[1] + ex_start, 16))
+            ex_start = max(1, min(existing[0], self._upper_limit)) - 1
+            ex_end = max(1, min(existing[1] + ex_start, self._upper_limit))
             for idx in range(ex_start, ex_end):
                 working_space[idx] = False
 
         def _check_length(idx):
             for idx2 in range(length):
-                if idx + idx2 > 15 or working_space[idx + idx2]:
+                if idx + idx2 > self._upper_limit - 1 or working_space[idx + idx2]:
                     return False
             return True
 
-        if start + length > 16:
+        if start + length > self._upper_limit:
             start = 0
             loop = False
 
