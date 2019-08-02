@@ -50,6 +50,9 @@ class MidiFixtureSettings(SettingsPage):
             'delegate': LabelDelegate(),
             'width': 28
         }, {
+            'delegate': SpinBoxDelegate(minimum=1, maximum=111),
+            'width': 72
+        }, {
             'delegate': LabelDelegate()
         }, {
             'delegate': RadioButtonDelegate(),
@@ -158,12 +161,19 @@ class MidiPatchModel(QAbstractTableModel):
                 'id': 'address',
                 'label': translate('MidiFixtureSettings', 'MIDI #'),
                 'flags': Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable,
+                'flags_alt': Qt.ItemIsEditable | Qt.ItemIsSelectable,
                 'setter': self._updateMidiAddress
             }, {
                 'id': 'address_end',
                 'label': translate('MidiFixtureSettings', 'To'),
                 'flags': Qt.ItemIsSelectable,
                 'getter': self._getMidiAddressEnd
+            }, {
+                'id': 'midi_device_id',
+                'label': translate('MidiFixtureSettings', 'Device ID'),
+                'flags': Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable,
+                'flags_alt': Qt.ItemIsEditable | Qt.ItemIsSelectable,
+                'setter': self._updateMidiDeviceId
             }, {
                 'id': 'label',
                 'label': translate('MidiFixtureSettings', 'Manufacturer & Model'),
@@ -201,9 +211,13 @@ class MidiPatchModel(QAbstractTableModel):
 
     def data(self, index, role=Qt.DisplayRole):
         if index.isValid():
-            if role in (Qt.DisplayRole, Qt.EditRole):
+            if role == Qt.DisplayRole:
                 if 'getter' in self.columns[index.column()]:
                     return self.columns[index.column()]['getter'](index.row())
+                value = self.rows[index.row()][index.column()]
+                return value if value != -1 else '-'
+
+            if role == Qt.EditRole:
                 return self.rows[index.row()][index.column()]
 
             if role == Qt.TextAlignmentRole:
@@ -220,9 +234,12 @@ class MidiPatchModel(QAbstractTableModel):
 
     def _getMidiAddressEnd(self, row):
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
-        fixture_address = self.data(self.getIndex(row, 'address'))
         fixture_profile = self.catalogue.device_description(fixture_id)
 
+        if not fixture_profile['requiresMidiChannel']:
+            return '-'
+
+        fixture_address = self.data(self.getIndex(row, 'address'))
         return fixture_profile['width'] + fixture_address - 1
 
     def _getFixtureLabel(self, row):
@@ -266,10 +283,19 @@ class MidiPatchModel(QAbstractTableModel):
 
     def appendPatch(self, fixture_id):
         fixture_profile = self.catalogue.device_description(fixture_id)
-        fixture_width = fixture_profile['width']
-        fixture_address = self.channel_address_space.find_block(1, fixture_width, loop=False)
-        if fixture_address == -1:
-            return
+
+        fixture_address = -1
+        if fixture_profile['requiresMidiChannel']:
+            fixture_width = fixture_profile['width']
+            fixture_address = self.channel_address_space.find_block(1, fixture_width, loop=False)
+            if fixture_address == -1:
+                return
+            self.channel_address_space.fill_block(fixture_address, fixture_width)
+
+        fixture_deviceid = -1
+        if fixture_profile['requiresMidiDeviceID']:
+            fixture_deviceid = self.deviceid_address_space.find_block(1, loop=False)
+            self.deviceid_address_space.fill_block(fixture_deviceid)
 
         set_dca = True
         for r in range(self.rowCount()):
@@ -277,47 +303,86 @@ class MidiPatchModel(QAbstractTableModel):
                 set_dca = False
                 break
 
-        self.channel_address_space.fill_block(fixture_address, fixture_width)
-
         row = self.rowCount() - 1
         self.beginInsertRows(QModelIndex(), row, row)
         self.rows.append(['patch#{0}'.format(self.patch_count),
                           fixture_id,
                           fixture_address,
                           None,
+                          fixture_deviceid,
                           None,
                           self.rowCount() == 0,
                           -1 if not fixture_profile['dcaCapable'] else set_dca])
         self.endInsertRows()
         self.patch_count += 1
 
-    def amendPatch(self, row, new_fixture_id):
+    def amendPatch(self, row, new_id):
         if row == -1 or row >= self.rowCount():
             return
-        fixture_address = self.data(self.getIndex(row, 'address'))
 
-        old_fixture_id = self.data(self.getIndex(row, 'fixture_id'))
-        old_fixture_profile = self.catalogue.device_description(old_fixture_id)
-        old_fixture_width = old_fixture_profile['width']
+        old_id = self.data(self.getIndex(row, 'fixture_id'))
+        old_profile = self.catalogue.device_description(old_id)
+        new_profile = self.catalogue.device_description(new_id)
 
-        new_fixture_profile = self.catalogue.device_description(new_fixture_id)
-        new_fixture_width = new_fixture_profile['width']
+        ### MIDI Channel Addresses (part 1):
+        # Get the width of the old profile, and the old address:
+        if old_profile['requiresMidiChannel']:
+            old_width = old_profile['width']
+            old_address = self.data(self.getIndex(row, 'address'))
 
-        new_fixture_address = self.channel_address_space.find_block(fixture_address,
-                                                                    new_fixture_width,
-                                                                    existing=[fixture_address, old_fixture_width]) # pylint: disable=line-too-long
-        if new_fixture_address == -1:
-            logger.warning("No space for this device!")
-            return
+        # Get the width of the new profile, and find space for the device
+        if new_profile['requiresMidiChannel']:
+            new_width = new_profile['width']
 
-        self.setData(self.getIndex(row, 'fixture_id'), new_fixture_id)
+            if old_profile['requiresMidiChannel']:
+                new_address = self.channel_address_space.find_block(old_address,
+                                                                    new_width,
+                                                                    existing=[old_address, old_width]) # pylint: disable=line-too-long
+            else:
+                new_address = self.channel_address_space.find_block(1, new_width)
 
-        if fixture_address != new_fixture_address or old_fixture_width != new_fixture_width:
-            self.channel_address_space.empty_block(fixture_address, old_fixture_width)
-            self.channel_address_space.fill_block(new_fixture_address, new_fixture_width)
+            # If the new address is -1, there isn't space for this device
+            if new_address == -1:
+                logger.warning("No space for this device!")
+                return
 
-        if old_fixture_profile['dcaCapable'] != new_fixture_profile['dcaCapable']:
-            if new_fixture_profile['dcaCapable']:
+        ### MIDI Device IDs:
+        # If the old profile needed a MIDI device id, but the new one doesn't: remove the assignment
+        if old_profile['requiresMidiDeviceID'] and not new_profile['requiresMidiDeviceID']:
+            midi_device_id = self.data(self.getIndex(row, 'midi_device_id'))
+            self.deviceid_address_space.empty_block(midi_device_id)
+            self.setData(self.getIndex(row, 'midi_device_id'),
+                         -1,
+                         disable_custom_setter=True)
+
+        # If the new profile needs a MIDI device id, but the old one didn't: add an assignment
+        elif not old_profile['requiresMidiDeviceID'] and new_profile['requiresMidiDeviceID']:
+            midi_device_id = self.deviceid_address_space.find_block(1, loop=False)
+            if midi_device_id == -1:
+                logger.warning("No space for this device!")
+                return
+
+            self.deviceid_address_space.fill_block(midi_device_id)
+            self.setData(self.getIndex(row, 'midi_device_id'),
+                         midi_device_id,
+                         disable_custom_setter=True)
+
+        ### MIDI Channel Addresses (part 2):
+        # At this point we know that the device fits in both channel and deviceid
+        # address spaces (where applicable). We've already updated the deviceid
+        # address space, so we need to update the channel address space.
+        if old_profile['requiresMidiChannel']:
+            self.channel_address_space.empty_block(old_address, old_width)
+
+        if new_profile['requiresMidiChannel']:
+            self.channel_address_space.fill_block(new_address, new_width)
+            self.setData(self.getIndex(row, 'address'), new_address, disable_custom_setter=True)
+        else:
+            self.setData(self.getIndex(row, 'address'), -1, disable_custom_setter=True)
+
+        ### DCA Assigns
+        if old_profile['dcaCapable'] != new_profile['dcaCapable']:
+            if new_profile['dcaCapable']:
                 set_dca = True
                 for r in range(self.rowCount()):
                     if self.flags(self.getIndex(r, 'dca_indicator')) & Qt.ItemIsUserCheckable:
@@ -332,13 +397,11 @@ class MidiPatchModel(QAbstractTableModel):
                             break
 
             self.setData(self.getIndex(row, 'dca_indicator'),
-                         set_dca if new_fixture_profile['dcaCapable'] else -1,
+                         set_dca if new_profile['dcaCapable'] else -1,
                          role=Qt.EditRole)
 
-        if fixture_address != new_fixture_address:
-            self.setData(self.getIndex(row, 'address'),
-                         new_fixture_address,
-                         disable_custom_setter=True)
+        ### And finally the Fixture ID (which identifies the device to the Fixture Library)
+        self.setData(self.getIndex(row, 'fixture_id'), new_id)
 
     def removePatch(self, row):
         if row == -1 or row >= self.rowCount():
@@ -346,9 +409,13 @@ class MidiPatchModel(QAbstractTableModel):
 
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
         fixture_profile = self.catalogue.device_description(fixture_id)
-        fixture_address = self.data(self.getIndex(row, 'address'))
 
-        self.channel_address_space.empty_block(fixture_address, fixture_profile['width'])
+        if fixture_profile['requiresMidiChannel']:
+            self.channel_address_space.empty_block(self.data(self.getIndex(row, 'address')),
+                                                   fixture_profile['width'])
+
+        if fixture_profile['requiresMidiDeviceID']:
+            self.deviceid_address_space.empty_block(self.data(self.getIndex(row, 'midi_device_id')))
 
         # Check if default device or chosen dca
         formerly_default = self.data(self.getIndex(row, 'default_indicator'))
@@ -413,6 +480,7 @@ class MidiPatchModel(QAbstractTableModel):
                               patch['midi_channel'] + 1,
                               None,
                               None,
+                              None,
                               patch['patch_id'] == config['default_patch'],
                               -1 if not fixture_profile['dcaCapable'] else patch['patch_id'] == config['dca_device']]) # pylint: disable=line-too-long
             self.channel_address_space.fill_block(patch['midi_channel'] + 1, fixture_profile['width'])
@@ -435,6 +503,18 @@ class MidiPatchModel(QAbstractTableModel):
 
         self.channel_address_space.empty_block(old_address, fixture_width)
         self.channel_address_space.fill_block(new_address, fixture_width)
+        return new_address
+
+    def _updateMidiDeviceId(self, row, value):
+        '''Validates and updates a user-input MIDI Address'''
+        old_address = self.data(self.getIndex(row, 'midi_device_id'))
+        new_address = self.deviceid_address_space.find_block(value, existing=old_address)
+
+        if new_address == -1:
+            return old_address
+
+        self.deviceid_address_space.empty_block(old_address)
+        self.deviceid_address_space.fill_block(new_address)
         return new_address
 
 
@@ -488,10 +568,13 @@ class MidiAddressSpace:
         working_space = copy(self.address_space)
 
         if existing:
-            ex_start = max(1, min(existing[0], self._upper_limit)) - 1
-            ex_end = max(1, min(existing[1] + ex_start, self._upper_limit))
-            for idx in range(ex_start, ex_end):
-                working_space[idx] = False
+            if isinstance(existing, list):
+                ex_start = max(1, min(existing[0], self._upper_limit)) - 1
+                ex_end = max(1, min(existing[1] + ex_start, self._upper_limit))
+                for idx in range(ex_start, ex_end):
+                    working_space[idx] = False
+            else:
+                working_space[existing - 1] = False
 
         def _check_length(idx):
             for idx2 in range(length):
