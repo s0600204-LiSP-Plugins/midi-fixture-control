@@ -77,8 +77,11 @@ class MidiFixtureControl(Plugin):
             patch_id = patch['patch_id']
 
             if patch_id not in self.fixtures:
-                self.fixtures[patch_id] = MIDIFixture(patch['fixture_id'],
-                                                      patch['midi_channel'])
+                self.fixtures[patch_id] = MIDIFixture(
+                    patch['fixture_id'],
+                    midi_channel=patch['midi_channel'] if 'midi_channel' in patch else None,
+                    midi_deviceid=patch['midi_deviceid'] if 'midi_deviceid' in patch else None
+                )
                 continue
 
             if patch['fixture_id'] != self.fixtures[patch_id].fixture_id:
@@ -92,5 +95,14 @@ class MidiFixtureControl(Plugin):
                     else:
                         raise
 
-            if patch['midi_channel'] != self.fixtures[patch_id].midi_channel:
-                self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])
+            if 'midi_channel' in patch:
+                if patch['midi_channel'] != self.fixtures[patch_id].midi_channel:
+                    self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])
+            elif self.fixtures[patch_id].midi_channel:
+                self.fixtures[patch_id].set_midi_channel(None)
+
+            if 'midi_deviceid' in patch:
+                if patch['midi_deviceid'] != self.fixtures[patch_id].midi_deviceid:
+                    self.fixtures[patch_id].set_midi_deviceid(patch['midi_deviceid'])
+            elif self.fixtures[patch_id].midi_deviceid:
+                self.fixtures[patch_id].set_midi_deviceid(None)

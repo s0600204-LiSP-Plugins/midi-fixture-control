@@ -67,11 +67,16 @@ class FixtureCommandCueSettings(SettingsPage):
         self.setLayout(QFormLayout())
 
         def _build_patch_label(profile):
-            return '{manufacturer} {model} (@{channel})'.format_map(
+            addresses = []
+            if profile.midi_channel is not None:
+                addresses.append('Channel #' + str(profile.midi_channel + 1))
+            if profile.midi_deviceid is not None:
+                addresses.append('ID #' + str(profile.midi_deviceid + 1))
+            return '{manufacturer} {model} [{addresses}]'.format_map(
                 {
                     'manufacturer': profile.manufacturer_name,
                     'model': profile.name,
-                    'channel': profile.midi_channel + 1
+                    'addresses': ', '.join(addresses)
                 })
 
         # Dropdown of available fixture patches
@@ -104,7 +109,7 @@ class FixtureCommandCueSettings(SettingsPage):
 
         # Supply new command list
         for cmd, details in fixture_profile.commands().items():
-            self.command_combo.addItem(details['caption'], cmd)
+            self.command_combo.addItem(details['caption'] if 'caption' in details else cmd, cmd)
         self.command_combo.currentIndexChanged.connect(self._select_command)
 
         # Clear arg list

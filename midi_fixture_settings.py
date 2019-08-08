@@ -448,11 +448,19 @@ class MidiPatchModel(QAbstractTableModel):
         dca_device = None
         patches = []
         for row in self.rows:
-            patches.append({
+            new_patch = {
                 'patch_id': row[self.column_map['patch_id']],
                 'fixture_id': row[self.column_map['fixture_id']],
-                'midi_channel': row[self.column_map['address']] - 1,
-            })
+            }
+
+            fixture_profile = self.catalogue.device_description(row[self.column_map['fixture_id']])
+            if fixture_profile['requiresMidiChannel']:
+                new_patch['midi_channel'] = row[self.column_map['address']] - 1
+            if fixture_profile['requiresMidiDeviceID']:
+                new_patch['midi_deviceid'] = row[self.column_map['midi_device_id']] - 1
+
+            patches.append(new_patch)
+
             if row[self.column_map['default_indicator']]:
                 default_patch = row[self.column_map['patch_id']]
             if row[self.column_map['dca_indicator']] == 1:
@@ -477,13 +485,18 @@ class MidiPatchModel(QAbstractTableModel):
             fixture_profile = self.catalogue.device_description(patch['fixture_id'])
             self.rows.append([patch['patch_id'],
                               patch['fixture_id'],
-                              patch['midi_channel'] + 1,
+                              patch['midi_channel'] + 1 if 'midi_channel' in patch else -1,
                               None,
-                              None,
+                              patch['midi_deviceid'] + 1 if 'midi_deviceid' in patch else -1,
                               None,
                               patch['patch_id'] == config['default_patch'],
                               -1 if not fixture_profile['dcaCapable'] else patch['patch_id'] == config['dca_device']]) # pylint: disable=line-too-long
-            self.channel_address_space.fill_block(patch['midi_channel'] + 1, fixture_profile['width'])
+
+            if fixture_profile['requiresMidiChannel']:
+                self.channel_address_space.fill_block(patch['midi_channel'] + 1, fixture_profile['width'])
+            if fixture_profile['requiresMidiDeviceID']:
+                self.deviceid_address_space.fill_block(patch['midi_deviceid'] + 1)
+
         self.endInsertRows()
 
     def _updateMidiAddress(self, row, value):
