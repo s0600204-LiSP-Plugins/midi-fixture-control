@@ -170,7 +170,7 @@ class MidiPatchModel(QAbstractTableModel):
                 'id': 'dca_indicator',
                 'label': translate('MidiFixtureSettings', 'DCA'),
                 'flags': Qt.ItemIsEditable | Qt.ItemIsUserCheckable | Qt.ItemIsEnabled | Qt.ItemIsSelectable, # pylint: disable=line-too-long
-                'flags_alt': Qt.ItemIsSelectable
+                'flags_alt': Qt.ItemIsEditable | Qt.ItemIsSelectable
             }
         ]
         self.column_map = {col_spec['id']: col_idx for col_idx, col_spec in enumerate(self.columns)}
@@ -241,7 +241,7 @@ class MidiPatchModel(QAbstractTableModel):
                                       [Qt.DisplayRole, Qt.EditRole])
                 return True
 
-            if role == Qt.CheckStateRole:
+            if role == Qt.CheckStateRole and self.flags(index) & Qt.ItemIsUserCheckable:
                 self.rows[index.row()][index.column()] = value == Qt.Checked
                 self.dataChanged.emit(self.index(index.row(), 0),
                                       self.index(index.row(), index.column()),
@@ -251,7 +251,8 @@ class MidiPatchModel(QAbstractTableModel):
                     for row_idx in range(0, self.rowCount()):
                         if row_idx != index.row():
                             newIndex = self.createIndex(row_idx, index.column())
-                            self.setData(newIndex, Qt.Unchecked, Qt.CheckStateRole)
+                            if self.flags(newIndex) & Qt.ItemIsUserCheckable:
+                                self.setData(newIndex, Qt.Unchecked, Qt.CheckStateRole)
                 return True
 
         return False
@@ -308,6 +309,25 @@ class MidiPatchModel(QAbstractTableModel):
             self.address_space.empty_block(fixture_address, old_fixture_width)
             self.address_space.fill_block(new_fixture_address, new_fixture_width)
 
+        if old_fixture_profile['dcaCapable'] != new_fixture_profile['dcaCapable']:
+            if new_fixture_profile['dcaCapable']:
+                set_dca = True
+                for r in range(self.rowCount()):
+                    if self.flags(self.getIndex(r, 'dca_indicator')) & Qt.ItemIsUserCheckable:
+                        set_dca = False
+                        break
+            else:
+                for row_idx in range(0, self.rowCount()):
+                    if row_idx != row:
+                        newIndex = self.getIndex(row_idx, 'dca_indicator')
+                        if self.flags(newIndex) & Qt.ItemIsUserCheckable:
+                            self.setData(newIndex, Qt.Checked, Qt.CheckStateRole)
+                            break
+
+            self.setData(self.getIndex(row, 'dca_indicator'),
+                         set_dca if new_fixture_profile['dcaCapable'] else -1,
+                         role=Qt.EditRole)
+
         if fixture_address != new_fixture_address:
             self.setData(self.getIndex(row, 'address'),
                          new_fixture_address,
@@ -323,18 +343,25 @@ class MidiPatchModel(QAbstractTableModel):
 
         self.address_space.empty_block(fixture_address, fixture_profile['width'])
 
-        # Check if default device
+        # Check if default device or chosen dca
         formerly_default = self.data(self.getIndex(row, 'default_indicator'))
+        formerly_dca = self.data(self.getIndex(row, 'dca_indicator'))
 
         self.beginRemoveRows(QModelIndex(), row, row)
         self.rows.pop(row)
         self.endRemoveRows()
 
-        # Do this after removing the row:
-        # a. in case we're removing row 0;
-        # b. To not iterate through a row we the remove
+        # Set new default device and chosen DCA (if either applicable)
+        # Do this after removing the row so as to not iterate through the row we're removing
         if formerly_default and self.rowCount():
             self.setData(self.getIndex(0, 'default_indicator'), Qt.Checked, Qt.CheckStateRole)
+
+        if formerly_dca and self.rowCount():
+            for row_idx in range(0, self.rowCount()):
+                newIndex = self.getIndex(row_idx, 'dca_indicator')
+                if self.flags(newIndex) & Qt.ItemIsUserCheckable:
+                    self.setData(newIndex, Qt.Checked, Qt.CheckStateRole)
+                    break
 
     def flags(self, index):
         if self.data(index, Qt.EditRole) == -1:
