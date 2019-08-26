@@ -381,7 +381,7 @@ class MidiPatchModel(QAbstractTableModel):
             })
             if row[self.column_map['default_indicator']]:
                 default_patch = row[self.column_map['patch_id']]
-            if row[self.column_map['dca_indicator']]:
+            if row[self.column_map['dca_indicator']] == 1:
                 dca_device = row[self.column_map['patch_id']]
 
         return {
