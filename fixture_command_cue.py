@@ -29,6 +29,7 @@ from PyQt5.QtWidgets import QFormLayout, QFrame, QComboBox, QSpinBox, QLineEdit
 from lisp.core.has_properties import Property
 from lisp.cues.cue import Cue
 from lisp.plugins import get_plugin
+from lisp.plugins.midi.midi_utils import midi_from_dict
 from lisp.ui.settings.cue_settings import CueSettingsRegistry
 from lisp.ui.settings.pages import SettingsPage
 from lisp.ui.ui_utils import translate
@@ -52,7 +53,7 @@ class FixtureCommandCue(Cue):
                                                      self.fixture_command['args'])
 
         for dict_message in midi_messages:
-            self._midi_out.send_from_dict(dict_message)
+            self._midi_out.send(midi_from_dict(dict_message))
 
         return False
 
