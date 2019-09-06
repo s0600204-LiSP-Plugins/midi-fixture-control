@@ -84,25 +84,20 @@ class MidiFixtureControl(Plugin):
                 )
                 continue
 
-            if patch['fixture_id'] != self.fixtures[patch_id].fixture_id:
-                try:
-                    self.fixtures[patch_id].change_fixture(patch['fixture_id'])
+            if 'midi_deviceid' in patch and patch['midi_deviceid'] != self.fixtures[patch_id].midi_deviceid:
+                self.fixtures[patch_id].set_midi_deviceid(patch['midi_deviceid'])
 
-                except FixtureWidthError:
-                    if patch['midi_channel'] != self.fixtures[patch_id].midi_channel:
-                        self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])
-                        self.fixtures[patch_id].change_fixture(patch['fixture_id'])
-                    else:
-                        raise
+            if 'midi_channel' in patch and (self.fixtures[patch_id].midi_channel is None or patch['midi_channel'] < self.fixtures[patch_id].midi_channel):
+                self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])
+
+            if patch['fixture_id'] != self.fixtures[patch_id].fixture_id:
+                self.fixtures[patch_id].change_fixture(patch['fixture_id'])
 
             if 'midi_channel' in patch:
-                if patch['midi_channel'] != self.fixtures[patch_id].midi_channel:
+                if patch['midi_channel'] > self.fixtures[patch_id].midi_channel:
                     self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])
-            elif self.fixtures[patch_id].midi_channel:
+            elif self.fixtures[patch_id].midi_channel is not None:
                 self.fixtures[patch_id].set_midi_channel(None)
 
-            if 'midi_deviceid' in patch:
-                if patch['midi_deviceid'] != self.fixtures[patch_id].midi_deviceid:
-                    self.fixtures[patch_id].set_midi_deviceid(patch['midi_deviceid'])
-            elif self.fixtures[patch_id].midi_deviceid:
+            if 'midi_deviceid' not in patch and self.fixtures[patch_id].midi_deviceid is not None:
                 self.fixtures[patch_id].set_midi_deviceid(None)
