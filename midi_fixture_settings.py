@@ -50,7 +50,7 @@ class MidiFixtureSettings(SettingsPage):
             'delegate': LabelDelegate(),
             'width': 28
         }, {
-            'delegate': SpinBoxDelegate(minimum=1, maximum=111),
+            'delegate': SpinBoxDelegate(minimum=0, maximum=111),
             'width': 72
         }, {
             'delegate': LabelDelegate()
@@ -457,7 +457,7 @@ class MidiPatchModel(QAbstractTableModel):
             if fixture_profile['requiresMidiChannel']:
                 new_patch['midi_channel'] = row[self.column_map['address']] - 1
             if fixture_profile['requiresMidiDeviceID']:
-                new_patch['midi_deviceid'] = row[self.column_map['midi_device_id']] - 1
+                new_patch['midi_deviceid'] = row[self.column_map['midi_device_id']]
 
             patches.append(new_patch)
 
@@ -487,7 +487,7 @@ class MidiPatchModel(QAbstractTableModel):
                               patch['fixture_id'],
                               patch['midi_channel'] + 1 if 'midi_channel' in patch else -1,
                               None,
-                              patch['midi_deviceid'] + 1 if 'midi_deviceid' in patch else -1,
+                              patch['midi_deviceid'] if 'midi_deviceid' in patch else -1,
                               None,
                               patch['patch_id'] == config['default_patch'],
                               -1 if not fixture_profile['dcaCapable'] else patch['patch_id'] == config['dca_device']]) # pylint: disable=line-too-long
@@ -495,7 +495,7 @@ class MidiPatchModel(QAbstractTableModel):
             if fixture_profile['requiresMidiChannel']:
                 self.channel_address_space.add(patch['midi_channel'] + 1, fixture_profile['width'])
             if fixture_profile['requiresMidiDeviceID']:
-                self.deviceid_address_space.add(patch['midi_deviceid'] + 1)
+                self.deviceid_address_space.add(patch['midi_deviceid'])
 
         self.endInsertRows()
 
@@ -645,7 +645,7 @@ class MidiChannelAddressSpace(AddressSpace):
 
 class MidiDeviceIdAddressSpace(AddressSpace):
     '''
-    MIDI Device ID 1-111
+    MIDI Device ID 0-111
     '''
     def __init__(self):
         super().__init__(111)
