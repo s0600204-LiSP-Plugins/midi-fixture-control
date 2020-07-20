@@ -37,7 +37,7 @@ class FixtureSelectDialog(QDialog):
 
         self.setWindowTitle(translate('MidiFixtureSettings', 'MIDI Fixture Selection'))
         self.setMinimumSize(600, 400)
-        self.catalogue = Catalogue()
+        self.catalogue = Catalogue(include_unstable=False)
 
         self.setLayout(QGridLayout())
 

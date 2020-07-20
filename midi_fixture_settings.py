@@ -134,7 +134,7 @@ class MidiPatchModel(QAbstractTableModel):
         super().__init__()
         self.channel_address_space = MidiChannelAddressSpace()
         self.deviceid_address_space = MidiDeviceIdAddressSpace()
-        self.catalogue = Catalogue()
+        self.catalogue = Catalogue(include_unstable=True)
         self.patch_count = 0
         self.rows = []
         self.columns = [
