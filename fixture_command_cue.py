@@ -49,8 +49,8 @@ class FixtureCommandCue(Cue):
             return False
 
         profile = get_plugin('MidiFixtureControl').get_profile(self.fixture_command['patch_id'])
-        midi_messages = profile.build_device_command(self.fixture_command['command'],
-                                                     self.fixture_command['args'])
+        midi_messages = profile.build_command(self.fixture_command['command'],
+                                              self.fixture_command['args'])
 
         for dict_message in midi_messages:
             self._midi_out.send(midi_from_dict(dict_message))
@@ -68,10 +68,10 @@ class FixtureCommandCueSettings(SettingsPage):
 
         def _build_patch_label(profile):
             addresses = []
-            if profile.midi_channel is not None:
-                addresses.append('Channel #' + str(profile.midi_channel + 1))
-            if profile.midi_deviceid is not None:
-                addresses.append('ID #' + str(profile.midi_deviceid + 1))
+            if profile.channel is not None:
+                addresses.append('Channel #' + str(profile.channel + 1))
+            if profile.deviceid is not None:
+                addresses.append('ID #' + str(profile.deviceid + 1))
             return '{manufacturer} {model} [{addresses}]'.format_map(
                 {
                     'manufacturer': profile.manufacturer_name,

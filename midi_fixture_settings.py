@@ -24,7 +24,7 @@ import logging
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex
 from PyQt5.QtWidgets import QGridLayout, QGroupBox, QPushButton, QVBoxLayout
 
-from midi_fixture_library import MIDIFixtureCatalogue
+from midi_fixture_library import Catalogue
 
 # pylint: disable=import-error
 from lisp.plugins import get_plugin, PluginNotLoadedError
@@ -145,7 +145,7 @@ class MidiPatchModel(QAbstractTableModel):
         super().__init__()
         self.channel_address_space = MidiChannelAddressSpace()
         self.deviceid_address_space = MidiDeviceIdAddressSpace()
-        self.catalogue = MIDIFixtureCatalogue()
+        self.catalogue = Catalogue()
         self.patch_count = 0
         self.rows = []
         self.columns = [

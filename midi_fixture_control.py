@@ -22,7 +22,7 @@ import logging
 # pylint: disable=no-name-in-module
 from PyQt5.QtCore import QT_TRANSLATE_NOOP
 
-from midi_fixture_library import MIDIFixture, FixtureWidthError
+from midi_fixture_library import Fixture, FixtureWidthError
 
 # pylint: disable=import-error
 from lisp.core.plugin import Plugin
@@ -77,27 +77,27 @@ class MidiFixtureControl(Plugin):
             patch_id = patch['patch_id']
 
             if patch_id not in self.fixtures:
-                self.fixtures[patch_id] = MIDIFixture(
+                self.fixtures[patch_id] = Fixture(
                     patch['fixture_id'],
-                    midi_channel=patch['midi_channel'] if 'midi_channel' in patch else None,
-                    midi_deviceid=patch['midi_deviceid'] if 'midi_deviceid' in patch else None
+                    channel=patch['midi_channel'] if 'midi_channel' in patch else None,
+                    deviceid=patch['midi_deviceid'] if 'midi_deviceid' in patch else None
                 )
                 continue
 
-            if 'midi_deviceid' in patch and patch['midi_deviceid'] != self.fixtures[patch_id].midi_deviceid:
-                self.fixtures[patch_id].set_midi_deviceid(patch['midi_deviceid'])
+            if 'midi_deviceid' in patch and patch['midi_deviceid'] != self.fixtures[patch_id].deviceid:
+                self.fixtures[patch_id].set_deviceid(patch['midi_deviceid'])
 
-            if 'midi_channel' in patch and (self.fixtures[patch_id].midi_channel is None or patch['midi_channel'] < self.fixtures[patch_id].midi_channel):
-                self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])
+            if 'midi_channel' in patch and (self.fixtures[patch_id].channel is None or patch['midi_channel'] < self.fixtures[patch_id].channel):
+                self.fixtures[patch_id].set_channel(patch['midi_channel'])
 
             if patch['fixture_id'] != self.fixtures[patch_id].fixture_id:
                 self.fixtures[patch_id].change_fixture(patch['fixture_id'])
 
             if 'midi_channel' in patch:
-                if patch['midi_channel'] > self.fixtures[patch_id].midi_channel:
-                    self.fixtures[patch_id].set_midi_channel(patch['midi_channel'])
-            elif self.fixtures[patch_id].midi_channel is not None:
-                self.fixtures[patch_id].set_midi_channel(None)
+                if patch['midi_channel'] > self.fixtures[patch_id].channel:
+                    self.fixtures[patch_id].set_channel(patch['midi_channel'])
+            elif self.fixtures[patch_id].channel is not None:
+                self.fixtures[patch_id].set_channel(None)
 
-            if 'midi_deviceid' not in patch and self.fixtures[patch_id].midi_deviceid is not None:
-                self.fixtures[patch_id].set_midi_deviceid(None)
+            if 'midi_deviceid' not in patch and self.fixtures[patch_id].deviceid is not None:
+                self.fixtures[patch_id].set_deviceid(None)
