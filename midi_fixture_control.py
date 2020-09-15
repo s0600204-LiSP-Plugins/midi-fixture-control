@@ -90,7 +90,7 @@ class MidiFixtureControl(Plugin):
             if 'midi_channel' in patch and (self.fixtures[patch_id].channel is None or patch['midi_channel'] < self.fixtures[patch_id].channel):
                 self.fixtures[patch_id].set_channel(patch['midi_channel'])
 
-            if patch['fixture_id'] != self.fixtures[patch_id].fixture_id:
+            if patch['fixture_id'] != self.fixtures[patch_id].profile.profile_id:
                 self.fixtures[patch_id].change_fixture(patch['fixture_id'])
 
             if 'midi_channel' in patch:

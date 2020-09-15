@@ -74,8 +74,8 @@ class FixtureCommandCueSettings(SettingsPage):
                 addresses.append('ID #' + str(profile.deviceid + 1))
             return '{manufacturer} {model} [{addresses}]'.format_map(
                 {
-                    'manufacturer': profile.manufacturer_name,
-                    'model': profile.name,
+                    'manufacturer': profile.profile.manufacturer_name,
+                    'model': profile.profile.name,
                     'addresses': ', '.join(addresses)
                 })
 
