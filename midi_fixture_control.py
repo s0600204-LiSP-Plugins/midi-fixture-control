@@ -85,19 +85,16 @@ class MidiFixtureControl(Plugin):
                 continue
 
             if 'midi_deviceid' in patch and patch['midi_deviceid'] != self.fixtures[patch_id].deviceid:
-                self.fixtures[patch_id].set_deviceid(patch['midi_deviceid'])
+                self.fixtures[patch_id].deviceid = patch['midi_deviceid']
 
             if 'midi_channel' in patch and (self.fixtures[patch_id].channel is None or patch['midi_channel'] < self.fixtures[patch_id].channel):
-                self.fixtures[patch_id].set_channel(patch['midi_channel'])
-
-            if patch['fixture_id'] != self.fixtures[patch_id].profile.profile_id:
-                self.fixtures[patch_id].change_fixture(patch['fixture_id'])
+                self.fixtures[patch_id].channel = patch['midi_channel']
 
             if 'midi_channel' in patch:
                 if patch['midi_channel'] > self.fixtures[patch_id].channel:
-                    self.fixtures[patch_id].set_channel(patch['midi_channel'])
+                    self.fixtures[patch_id].channel = patch['midi_channel']
             elif self.fixtures[patch_id].channel is not None:
-                self.fixtures[patch_id].set_channel(None)
+                self.fixtures[patch_id].channel = None
 
             if 'midi_deviceid' not in patch and self.fixtures[patch_id].deviceid is not None:
-                self.fixtures[patch_id].set_deviceid(None)
+                self.fixtures[patch_id].deviceid = None

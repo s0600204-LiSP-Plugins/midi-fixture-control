@@ -108,7 +108,8 @@ class FixtureCommandCueSettings(SettingsPage):
         fixture_profile = self._get_current_fixture_profile()
 
         # Supply new command list
-        for cmd, details in fixture_profile.commands().items():
+        for cmd in fixture_profile.command_list:
+            details = fixture_profile.command(cmd)
             self.command_combo.addItem(details['caption'] if 'caption' in details else cmd, cmd)
         self.command_combo.currentIndexChanged.connect(self._select_command)
 

@@ -82,39 +82,23 @@ class MidiFixtureSettings(SettingsPage):
 
         self.patchListModel = MidiPatchModel()
         self.patchListView = SimpleTableView(self.patchListModel, self.TABLE_COLUMNS)
-        self.patchGroup.layout().addWidget(self.patchListView, 0, 0, 1, 3)
+        self.patchGroup.layout().addWidget(self.patchListView, 0, 0, 1, 2)
 
         self.addToPatchButton = QPushButton(self.patchGroup)
         self.addToPatchButton.setText('Add')
         self.addToPatchButton.clicked.connect(self._addPatch)
         self.patchGroup.layout().addWidget(self.addToPatchButton, 1, 0)
 
-        self.editPatchButton = QPushButton(self.patchGroup)
-        self.editPatchButton.setText('Edit')
-        self.editPatchButton.clicked.connect(self._amendPatch)
-        self.patchGroup.layout().addWidget(self.editPatchButton, 1, 1)
-
         self.removeFromPatchButton = QPushButton(self.patchGroup)
         self.removeFromPatchButton.setText('Remove')
         self.removeFromPatchButton.clicked.connect(self._removePatch)
-        self.patchGroup.layout().addWidget(self.removeFromPatchButton, 1, 2)
+        self.patchGroup.layout().addWidget(self.removeFromPatchButton, 1, 1)
 
     def _addPatch(self):
         fixture_id = self.selectFixture()
         if not fixture_id:
             return
         self.patchListModel.appendPatch(fixture_id)
-
-    def _amendPatch(self):
-        if not self.patchListView.selectedIndexes():
-            return
-
-        fixture_id = self.selectFixture()
-        if not fixture_id:
-            return
-
-        self.patchListModel.amendPatch(self.patchListView.selectedIndexes()[0].row(),
-                                       fixture_id)
 
     def _removePatch(self):
         if not self.patchListView.selectedIndexes():
