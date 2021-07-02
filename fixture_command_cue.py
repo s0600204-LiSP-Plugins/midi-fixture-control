@@ -22,8 +22,8 @@
 import logging
 
 # pylint: disable=no-name-in-module
-from PyQt5.QtCore import Qt, QT_TRANSLATE_NOOP
-from PyQt5.QtWidgets import QFormLayout, QFrame, QComboBox, QSlider, QSpinBox, QLineEdit
+from PyQt5.QtCore import QT_TRANSLATE_NOOP
+from PyQt5.QtWidgets import QFormLayout, QFrame, QComboBox, QSpinBox, QLineEdit
 
 # pylint: disable=import-error
 from lisp.core.has_properties import Property
@@ -33,7 +33,8 @@ from lisp.plugins.midi.midi_utils import midi_from_dict
 from lisp.ui.settings.cue_settings import CueSettingsRegistry
 from lisp.ui.settings.pages import SettingsPage
 from lisp.ui.ui_utils import translate
-from lisp.ui.widgets import QStyledSlider
+
+from .fader import QFader
 
 class FixtureCommandCue(Cue):
     Name = QT_TRANSLATE_NOOP('CueName', 'Fixture Command Cue')
@@ -134,7 +135,7 @@ class FixtureCommandCueSettings(SettingsPage):
             elif definition['type'] == 'textual':
                 widget = QLineEdit(self)
             elif definition['type'] == 'slider':
-                widget = QStyledSlider(self)
+                widget = QFader(self)
             else:
                 logging.warning("Unrecognised argument type: %s", {definition['type']})
                 continue
@@ -177,15 +178,10 @@ class FixtureCommandCueSettings(SettingsPage):
             elif isinstance(widget, QLineEdit):
                 widget.clear()
 
-            elif isinstance(widget, QStyledSlider):
+            elif isinstance(widget, QFader):
                 if widget.receivers(widget.valueChanged) > 0:
                     widget.valueChanged.disconnect()
-                widget.setSingleStep(3)
-                widget.setPageStep(12)
-                widget.setTickPosition(QSlider.TicksBelow)
-                widget.setTickInterval(10)
-                widget.setOrientation(Qt.Horizontal)
-                widget.setRange(1,1)
+                widget.setRange(0, 0)
 
         conditional = []
         # Give input widgets their actual value ranges.
@@ -199,7 +195,7 @@ class FixtureCommandCueSettings(SettingsPage):
                 continue
 
             widget = self.argument_sources[name]
-            if isinstance(widget, QSpinBox) or isinstance(widget, QStyledSlider):
+            if isinstance(widget, QSpinBox) or isinstance(widget, QFader):
                 limit = (limit for limit in values)
                 widget.setRange(next(limit), next(limit))
 
@@ -269,7 +265,7 @@ class FixtureCommandCueSettings(SettingsPage):
         for name, value in conf['args'].items():
             if name in self.argument_sources:
                 widget = self.argument_sources[name]
-                if isinstance(widget, QSpinBox) or isinstance(widget, QStyledSlider):
+                if isinstance(widget, QSpinBox) or isinstance(widget, QFader):
                     widget.setValue(value)
 
                 elif isinstance(widget, QComboBox):
@@ -281,7 +277,7 @@ class FixtureCommandCueSettings(SettingsPage):
 
     def _get_value_from_argument_widget(self, widget_name):
         widget = self.argument_sources[widget_name]
-        if isinstance(widget, QSpinBox) or isinstance(widget, QStyledSlider):
+        if isinstance(widget, QSpinBox) or isinstance(widget, QFader):
             return widget.value()
         if isinstance(widget, QComboBox):
             return widget.currentData()
@@ -301,7 +297,7 @@ class FixtureCommandCueSettings(SettingsPage):
                     and definition['valuesConditionalOn'] == transmitter_name):
                 widget = self.argument_sources[name]
 
-                if isinstance(widget, QSpinBox) or isinstance(widget, QStyledSlider):
+                if isinstance(widget, QSpinBox) or isinstance(widget, QFader):
                     limit = (limit for limit in values[current_value])
                     self.argument_sources[name].setRange(next(limit), next(limit))
 
