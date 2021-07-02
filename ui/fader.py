@@ -13,7 +13,7 @@ from PyQt5.QtGui import (
 )
 from PyQt5.QtWidgets import QAbstractSlider, QStyle, QStyleOptionSlider
 
-class QFader(QAbstractSlider):
+class Fader(QAbstractSlider):
 
     textWidth = 52
     sliderStyleOption = QStyleOptionSlider()
