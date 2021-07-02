@@ -2,16 +2,7 @@
 # pylint: disable=no-name-in-module
 from PyQt5.QtCore import Qt, QEvent, QModelIndex
 from PyQt5.QtGui import QMouseEvent
-from PyQt5.QtWidgets import QApplication, QHeaderView, QStyle, QStyledItemDelegate, QStyleOptionButton, QTableView, QTableWidget
-
-class LabelDelegate(QStyledItemDelegate):
-    '''Read/display-only text delegate. Y'know, a "Label".'''
-    # pylint: disable=too-few-public-methods
-
-    def createEditor(self, parent, option, index):
-        # pylint: disable=invalid-name, no-self-use, unused-argument,
-        '''Disable the Editor'''
-        return None
+from PyQt5.QtWidgets import QApplication, QStyle, QStyledItemDelegate, QStyleOptionButton
 
 class RadioButtonDelegate(QStyledItemDelegate):
     '''Radio Button Delegate
@@ -83,39 +74,3 @@ class RadioButtonHidableDelegate(RadioButtonDelegate):
         if index.data(Qt.EditRole) == -1:
             return
         super().paint(painter, option, index)
-
-class SimpleTableView(QTableView):
-    # pylint: disable=too-few-public-methods
-    """Simple implementation of a QTableView"""
-
-    def __init__(self, model, columns, **kwargs):
-        super().__init__(**kwargs)
-
-        self.setSelectionBehavior(QTableWidget.SelectRows)
-        self.setSelectionMode(QTableView.SingleSelection)
-
-        self.setShowGrid(False)
-        self.setAlternatingRowColors(True)
-
-        self.horizontalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.horizontalHeader().setStretchLastSection(False)
-        self.horizontalHeader().setHighlightSections(False)
-
-        self.verticalHeader().setSectionResizeMode(QHeaderView.Fixed)
-        self.verticalHeader().setDefaultSectionSize(24)
-        self.verticalHeader().setHighlightSections(False)
-
-        self.setModel(model)
-
-        self.columns = columns
-        for col_idx, col_spec in enumerate(self.columns):
-            if col_spec is None:
-                self.setColumnHidden(col_idx, True)
-                continue
-
-            self.setItemDelegateForColumn(col_idx, col_spec['delegate'])
-
-            if 'width' in col_spec:
-                self.horizontalHeader().resizeSection(col_idx, col_spec['width'])
-            else:
-                self.horizontalHeader().setSectionResizeMode(col_idx, QHeaderView.Stretch)
