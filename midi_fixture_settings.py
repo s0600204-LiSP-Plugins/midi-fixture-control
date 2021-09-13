@@ -27,7 +27,8 @@ from PyQt5.QtWidgets import QGridLayout, QGroupBox, QPushButton, QVBoxLayout
 from midi_fixture_library import Catalogue
 
 # pylint: disable=import-error
-from lisp.plugins import get_plugin, PluginNotLoadedError
+from lisp.plugins import get_plugin
+from lisp.core.plugin import PluginNotLoadedError
 from lisp.ui.qdelegates import SpinBoxDelegate
 from lisp.ui.settings.pages import SettingsPage
 from lisp.ui.ui_utils import translate
@@ -69,7 +70,8 @@ class MidiFixtureSettings(SettingsPage):
         self.layout().setAlignment(Qt.AlignTop)
 
         try:
-            get_plugin('DcaPlotter')
+            if not get_plugin('DcaPlotter').is_loaded():
+                self.TABLE_COLUMNS[7] = None
         except PluginNotLoadedError:
             self.TABLE_COLUMNS[7] = None
 
