@@ -23,7 +23,7 @@
 # pylint: disable=no-name-in-module
 from PyQt5.QtCore import Qt, QEvent, QModelIndex
 from PyQt5.QtGui import QMouseEvent
-from PyQt5.QtWidgets import QApplication, QStyle, QStyledItemDelegate, QStyleOptionButton
+from PyQt5.QtWidgets import QApplication, QRadioButton, QStyle, QStyledItemDelegate, QStyleOptionButton, QStyleOptionViewItem
 
 class RadioButtonDelegate(QStyledItemDelegate):
     '''Radio Button Delegate
@@ -34,11 +34,18 @@ class RadioButtonDelegate(QStyledItemDelegate):
 
     Logic is loosely adapted from:
       https://stackoverflow.com/questions/16237708/align-checkable-items-in-qtablewidget/16301316#16301316
+    With a styling hint from:
+      https://forum.qt.io/topic/72487/stylesheet-with-qstyleditemdelegate
     '''
+
+    # This is used as a style hint only, it doesn't actually ever appear.
+    # Without it, the radio button delegate appears unthemed.
+    _radiobutton_stylehint = QRadioButton()
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.last_clicked_index = QModelIndex()
+
 
     def createEditor(self, parent, option, index):
         # pylint: disable=invalid-name, no-self-use, unused-argument,
@@ -76,13 +83,17 @@ class RadioButtonDelegate(QStyledItemDelegate):
         '''Draw a radio-button circle in the middle of the draw-space'''
 
         button_option = QStyleOptionButton()
+        self._radiobutton_stylehint.initStyleOption(button_option)
         button_option.state |= QStyle.State_On if index.data(Qt.CheckStateRole) == Qt.Checked else QStyle.State_Off
         button_option.rect = QApplication.style().subElementRect(QStyle.SE_RadioButtonIndicator,
                                                                  option)
         button_option.rect.moveTo(option.rect.center().x() - button_option.rect.width() / 2,
                                   option.rect.center().y() - button_option.rect.height() / 2)
 
-        QApplication.style().drawPrimitive(QStyle.PE_IndicatorRadioButton, button_option, painter)
+        QApplication.style().drawControl(QStyle.CE_RadioButton,
+                                         button_option,
+                                         painter,
+                                         self._radiobutton_stylehint)
 
 class RadioButtonHidableDelegate(RadioButtonDelegate):
     '''Hidable Radio Button Delegate
