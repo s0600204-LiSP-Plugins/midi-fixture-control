@@ -22,7 +22,7 @@
 
 # pylint: disable=missing-docstring, invalid-name
 
-from math import log10
+from math import log10, trunc
 
 # pylint: disable=no-name-in-module
 from PyQt5.QtCore import QPointF, QRect, Qt
@@ -76,11 +76,13 @@ class Fader(QAbstractSlider):
         self.sliderStyleOption.minimum = self.dbToSliderValue(self.dBMin)
         self.sliderStyleOption.maximum = self.dbToSliderValue(self.dBMax)
 
-        self._sliderMargin = self.style().subControlRect(
-            QStyle.CC_Slider,
-            self.sliderStyleOption,
-            QStyle.SC_SliderHandle
-        ).width() / 2
+        self._sliderMargin = trunc(
+            self.style().subControlRect(
+                QStyle.CC_Slider,
+                self.sliderStyleOption,
+                QStyle.SC_SliderHandle
+            ).width() / 2
+        )
         self._sliderX = (
             self._sliderMargin,
             self.width() - self.textWidth - self._sliderMargin

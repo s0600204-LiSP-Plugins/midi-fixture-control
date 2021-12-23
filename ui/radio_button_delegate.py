@@ -20,6 +20,8 @@
 # You should have received a copy of the GNU General Public License
 # along with Linux Show Player.  If not, see <http://www.gnu.org/licenses/>.
 
+from math import trunc
+
 # pylint: disable=no-name-in-module
 from PyQt5.QtCore import Qt, QEvent, QModelIndex
 from PyQt5.QtGui import QMouseEvent
@@ -87,8 +89,8 @@ class RadioButtonDelegate(QStyledItemDelegate):
         button_option.state |= QStyle.State_On if index.data(Qt.CheckStateRole) == Qt.Checked else QStyle.State_Off
         button_option.rect = QApplication.style().subElementRect(QStyle.SE_RadioButtonIndicator,
                                                                  option)
-        button_option.rect.moveTo(option.rect.center().x() - button_option.rect.width() / 2,
-                                  option.rect.center().y() - button_option.rect.height() / 2)
+        button_option.rect.moveTo(option.rect.center().x() - trunc(button_option.rect.width() / 2),
+                                  option.rect.center().y() - trunc(button_option.rect.height() / 2))
 
         QApplication.style().drawControl(QStyle.CE_RadioButton,
                                          button_option,
