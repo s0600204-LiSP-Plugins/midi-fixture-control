@@ -29,7 +29,6 @@ from midi_fixture_library import Fixture, FixtureWidthError
 
 # pylint: disable=import-error
 from lisp.core.plugin import Plugin
-from lisp.cues.cue_factory import CueFactory
 from lisp.ui.settings.session_configuration import SessionConfigurationDialog
 
 from .fixture_command_cue import FixtureCommandCue
@@ -53,7 +52,7 @@ class MidiFixtureControl(Plugin):
             'midi_fixture_control', MidiFixtureSettings, self)
 
         # Register the Fixture Command cue type
-        CueFactory.register_factory(FixtureCommandCue.__name__, FixtureCommandCue)
+        app.cue_factory.register_factory(FixtureCommandCue.__name__, FixtureCommandCue)
         app.window.registerSimpleCueMenu(
             FixtureCommandCue, QT_TRANSLATE_NOOP("CueCategory", "Integration cues")
         )

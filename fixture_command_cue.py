@@ -44,8 +44,8 @@ class FixtureCommandCue(Cue):
 
     fixture_command = Property()
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self.name = translate('CueName', self.Name)
         self._midi_out = get_plugin('Midi').output
 
