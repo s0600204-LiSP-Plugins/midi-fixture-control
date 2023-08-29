@@ -132,8 +132,12 @@ class MidiPatchModel(QAbstractTableModel):
 
     def __init__(self):
         super().__init__()
-        self.channel_address_space = MidiChannelAddressSpace()
-        self.deviceid_address_space = MidiDeviceIdAddressSpace()
+        self._midi = get_plugin('Midi')
+        self.channel_address_spaces = {}
+        self.deviceid_address_spaces = {}
+        self.channel_address_spaces["out"] = MidiChannelAddressSpace()
+        self.deviceid_address_spaces["out"] = MidiDeviceIdAddressSpace()
+
         self.catalogue = Catalogue(include_unstable=True)
         self.patch_count = 0
         self.rows = []
@@ -276,15 +280,15 @@ class MidiPatchModel(QAbstractTableModel):
         fixture_address = -1
         if fixture_profile['requiresMidiChannel']:
             fixture_width = fixture_profile['width']
-            fixture_address = self.channel_address_space.find(1, fixture_width)
+            fixture_address = self.channel_address_spaces["out"].find(1, fixture_width)
             if fixture_address == -1:
                 return
-            self.channel_address_space.add(fixture_address, fixture_width)
+            self.channel_address_spaces["out"].add(fixture_address, fixture_width)
 
         fixture_deviceid = -1
         if fixture_profile['requiresMidiDeviceID']:
-            fixture_deviceid = self.deviceid_address_space.find(1)
-            self.deviceid_address_space.add(fixture_deviceid)
+            fixture_deviceid = self.deviceid_address_spaces["out"].find(1)
+            self.deviceid_address_spaces["out"].add(fixture_deviceid)
 
         set_dca = True
         for r in range(self.rowCount()):
@@ -324,11 +328,11 @@ class MidiPatchModel(QAbstractTableModel):
             new_width = new_profile['width']
 
             if old_profile['requiresMidiChannel']:
-                new_address = self.channel_address_space.find(old_address,
-                                                              new_width,
-                                                              previous=[old_address, old_width])
+                new_address = self.channel_address_spaces["out"].find(old_address,
+                                                                      new_width,
+                                                                      previous=[old_address, old_width])
             else:
-                new_address = self.channel_address_space.find(1, new_width)
+                new_address = self.channel_address_spaces["out"].find(1, new_width)
 
             # If the new address is -1, there isn't space for this device
             if new_address == -1:
@@ -339,19 +343,19 @@ class MidiPatchModel(QAbstractTableModel):
         # If the old profile needed a MIDI device id, but the new one doesn't: remove the assignment
         if old_profile['requiresMidiDeviceID'] and not new_profile['requiresMidiDeviceID']:
             midi_device_id = self.data(self.getIndex(row, 'midi_device_id'))
-            self.deviceid_address_space.remove(midi_device_id)
+            self.deviceid_address_spaces["out"].remove(midi_device_id)
             self.setData(self.getIndex(row, 'midi_device_id'),
                          -1,
                          disable_custom_setter=True)
 
         # If the new profile needs a MIDI device id, but the old one didn't: add an assignment
         elif not old_profile['requiresMidiDeviceID'] and new_profile['requiresMidiDeviceID']:
-            midi_device_id = self.deviceid_address_space.find(1)
+            midi_device_id = self.deviceid_address_spaces["out"].find(1)
             if midi_device_id == -1:
                 logger.warning("No space for this device!")
                 return
 
-            self.deviceid_address_space.add(midi_device_id)
+            self.deviceid_address_spaces["out"].add(midi_device_id)
             self.setData(self.getIndex(row, 'midi_device_id'),
                          midi_device_id,
                          disable_custom_setter=True)
@@ -361,10 +365,10 @@ class MidiPatchModel(QAbstractTableModel):
         # address spaces (where applicable). We've already updated the deviceid
         # address space, so we need to update the channel address space.
         if old_profile['requiresMidiChannel']:
-            self.channel_address_space.remove(old_address, old_width)
+            self.channel_address_spaces["out"].remove(old_address, old_width)
 
         if new_profile['requiresMidiChannel']:
-            self.channel_address_space.add(new_address, new_width)
+            self.channel_address_spaces["out"].add(new_address, new_width)
             self.setData(self.getIndex(row, 'address'), new_address, disable_custom_setter=True)
         else:
             self.setData(self.getIndex(row, 'address'), -1, disable_custom_setter=True)
@@ -400,11 +404,11 @@ class MidiPatchModel(QAbstractTableModel):
         fixture_profile = self.catalogue.device_description(fixture_id)
 
         if fixture_profile['requiresMidiChannel']:
-            self.channel_address_space.remove(self.data(self.getIndex(row, 'address')),
+            self.channel_address_spaces["out"].remove(self.data(self.getIndex(row, 'address')),
                                               fixture_profile['width'])
 
         if fixture_profile['requiresMidiDeviceID']:
-            self.deviceid_address_space.remove(self.data(self.getIndex(row, 'midi_device_id')))
+            self.deviceid_address_spaces["out"].remove(self.data(self.getIndex(row, 'midi_device_id')))
 
         # Check if default device or chosen dca
         formerly_default = self.data(self.getIndex(row, 'default_indicator'))
@@ -482,9 +486,9 @@ class MidiPatchModel(QAbstractTableModel):
                               -1 if not fixture_profile['dcaCapable'] else patch['patch_id'] == config['dca_device']]) # pylint: disable=line-too-long
 
             if fixture_profile['requiresMidiChannel']:
-                self.channel_address_space.add(patch['midi_channel'] + 1, fixture_profile['width'])
+                self.channel_address_spaces["out"].add(patch['midi_channel'] + 1, fixture_profile['width'])
             if fixture_profile['requiresMidiDeviceID']:
-                self.deviceid_address_space.add(patch['midi_deviceid'])
+                self.deviceid_address_spaces["out"].add(patch['midi_deviceid'])
 
         self.endInsertRows()
 
@@ -497,26 +501,26 @@ class MidiPatchModel(QAbstractTableModel):
         fixture_profile = self.catalogue.device_description(fixture_id)
         fixture_width = fixture_profile['width']
 
-        new_address = self.channel_address_space.find(new_address,
-                                                      fixture_width,
-                                                      previous=[old_address, fixture_width])
+        new_address = self.channel_address_spaces["out"].find(new_address,
+                                                         fixture_width,
+                                                         previous=[old_address, fixture_width])
         if new_address == -1:
             return old_address
 
-        self.channel_address_space.remove(old_address, fixture_width)
-        self.channel_address_space.add(new_address, fixture_width)
+        self.channel_address_spaces["out"].remove(old_address, fixture_width)
+        self.channel_address_spaces["out"].add(new_address, fixture_width)
         return new_address
 
     def _updateMidiDeviceId(self, row, value):
         '''Validates and updates a user-input MIDI Address'''
         old_address = self.data(self.getIndex(row, 'midi_device_id'))
-        new_address = self.deviceid_address_space.find(value, previous=old_address)
+        new_address = self.deviceid_address_spaces["out"].find(value, previous=old_address)
 
         if new_address == -1:
             return old_address
 
-        self.deviceid_address_space.remove(old_address)
-        self.deviceid_address_space.add(new_address)
+        self.deviceid_address_spaces["out"].remove(old_address)
+        self.deviceid_address_spaces["out"].add(new_address)
 
         return new_address
 
