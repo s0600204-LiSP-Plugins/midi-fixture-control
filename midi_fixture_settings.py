@@ -32,12 +32,13 @@ from midi_fixture_library import Catalogue
 # pylint: disable=import-error
 from lisp.plugins import get_plugin
 from lisp.core.plugin import PluginNotLoadedError
+from lisp.plugins.midi.midi_utils import PortDirection
 from lisp.ui.qdelegates import SpinBoxDelegate
 from lisp.ui.settings.pages import SettingsPage
 from lisp.ui.ui_utils import translate
 
 from .midi_fixture_select import FixtureSelectDialog
-from .ui import LabelDelegate, RadioButtonDelegate, RadioButtonHidableDelegate, SimpleTableView
+from .ui import LabelDelegate, MIDIPatchComboDelegate, RadioButtonDelegate, RadioButtonHidableDelegate, SimpleTableView
 
 logger = logging.getLogger(__name__) # pylint: disable=invalid-name
 
@@ -48,7 +49,7 @@ class MidiFixtureSettings(SettingsPage):
     TABLE_COLUMNS = [
         None, None,
         {
-            'delegate': LabelDelegate(),
+            'delegate': MIDIPatchComboDelegate(PortDirection.Output),
             'width': 128
         }, {
             'delegate': SpinBoxDelegate(minimum=1, maximum=16),
@@ -161,7 +162,8 @@ class MidiPatchModel(QAbstractTableModel):
             }, {
                 'id': 'midi_patch',
                 'label': translate('MidiFixtureSettings', 'MIDI Output'),
-                'flags': Qt.ItemIsSelectable,
+                'flags': Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable,
+                'setter': self._updateMidiPatch
             }, {
                 'id': 'address',
                 'label': translate('MidiFixtureSettings', 'MIDI #'),
@@ -458,6 +460,7 @@ class MidiPatchModel(QAbstractTableModel):
         patches = []
         for row in self.rows:
             new_patch = {
+                'midi_patch': row[self.column_map['midi_patch']],
                 'patch_id': row[self.column_map['patch_id']],
                 'fixture_id': row[self.column_map['fixture_id']],
             }
@@ -547,6 +550,44 @@ class MidiPatchModel(QAbstractTableModel):
 
         return new_address
 
+    def _updateMidiPatch(self, row, value):
+        old_patch = self.data(self.getIndex(row, 'midi_patch'))
+        new_patch = value
+        if old_patch == new_patch:
+            return old_patch
+
+        fixture_id = self.data(self.getIndex(row, 'fixture_id'))
+        fixture_profile = self.catalogue.device_description(fixture_id)
+
+        if fixture_profile['requiresMidiChannel']:
+            current_address = self.data(self.getIndex(row, 'address'))
+            fixture_width = fixture_profile['width']
+            new_address = self.channel_address_spaces[new_patch].find(
+                current_address, fixture_width
+            )
+            if new_address == -1:
+                logger.warning("No space in this address space!")
+                return old_patch
+
+        if fixture_profile['requiresMidiDeviceID']:
+            current_deviceid = self.data(self.getIndex(row, 'midi_device_id'))
+            new_deviceid = self.deviceid_address_spaces[new_patch].find(current_deviceid)
+            if new_deviceid == -1:
+                logger.warning("No space in this address space!")
+                return old_patch
+
+            self.deviceid_address_spaces[old_patch].remove(current_deviceid)
+            self.deviceid_address_spaces[new_patch].add(new_deviceid)
+            if current_deviceid != new_deviceid:
+                self.setData(self.getIndex(row, 'midi_device_id'), new_deviceid, disable_custom_setter=True)
+
+        if fixture_profile['requiresMidiChannel']:
+            self.channel_address_spaces[old_patch].remove(current_address, fixture_width)
+            self.channel_address_spaces[new_patch].add(new_address, fixture_width)
+            if current_address != new_address:
+                self.setData(self.getIndex(row, 'address'), new_address, disable_custom_setter=True)
+
+        return new_patch
 
 class AddressSpace:
     '''
