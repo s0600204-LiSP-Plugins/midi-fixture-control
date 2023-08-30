@@ -163,6 +163,7 @@ class MidiPatchModel(QAbstractTableModel):
                 'id': 'midi_patch',
                 'label': translate('MidiFixtureSettings', 'MIDI Output'),
                 'flags': Qt.ItemIsEditable | Qt.ItemIsEnabled | Qt.ItemIsSelectable,
+                'getter': self._getMidiPatchName,
                 'setter': self._updateMidiPatch
             }, {
                 'id': 'address',
@@ -258,6 +259,10 @@ class MidiPatchModel(QAbstractTableModel):
             'model': fixture_profile['name']
         })
 
+    def _getMidiPatchName(self, row):
+        midi_patch = self.data(self.getIndex(row, 'midi_patch'), Qt.EditRole)
+        return self._midi.output_name_formatted(midi_patch)
+
     def setData(self, index, value, role=Qt.DisplayRole, disable_custom_setter=False):
         # pylint: disable=invalid-name, missing-docstring
         if index.isValid() and self.flags(index) & Qt.ItemIsEditable:
@@ -329,7 +334,7 @@ class MidiPatchModel(QAbstractTableModel):
         if row == -1 or row >= self.rowCount():
             return
 
-        midi_patch = self.data(self.getIndex(row, 'midi_patch'))
+        midi_patch = self.data(self.getIndex(row, 'midi_patch'), Qt.EditRole)
         old_id = self.data(self.getIndex(row, 'fixture_id'))
         old_profile = self.catalogue.device_description(old_id)
         new_profile = self.catalogue.device_description(new_id)
@@ -417,7 +422,7 @@ class MidiPatchModel(QAbstractTableModel):
         if row == -1 or row >= self.rowCount():
             return
 
-        midi_patch = self.data(self.getIndex(row, 'midi_patch'))
+        midi_patch = self.data(self.getIndex(row, 'midi_patch'), Qt.EditRole)
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
         fixture_profile = self.catalogue.device_description(fixture_id)
 
@@ -521,7 +526,7 @@ class MidiPatchModel(QAbstractTableModel):
         old_address = self.data(self.getIndex(row, 'address'))
         new_address = value
 
-        midi_patch = self.data(self.getIndex(row, 'midi_patch'))
+        midi_patch = self.data(self.getIndex(row, 'midi_patch'), Qt.EditRole)
         fixture_id = self.data(self.getIndex(row, 'fixture_id'))
         fixture_profile = self.catalogue.device_description(fixture_id)
         fixture_width = fixture_profile['width']
@@ -538,7 +543,7 @@ class MidiPatchModel(QAbstractTableModel):
 
     def _updateMidiDeviceId(self, row, value):
         '''Validates and updates a user-input MIDI Address'''
-        midi_patch = self.data(self.getIndex(row, 'midi_patch'))
+        midi_patch = self.data(self.getIndex(row, 'midi_patch'), Qt.EditRole)
         old_address = self.data(self.getIndex(row, 'midi_device_id'))
         new_address = self.deviceid_address_spaces[midi_patch].find(value, previous=old_address)
 
@@ -551,7 +556,7 @@ class MidiPatchModel(QAbstractTableModel):
         return new_address
 
     def _updateMidiPatch(self, row, value):
-        old_patch = self.data(self.getIndex(row, 'midi_patch'))
+        old_patch = self.data(self.getIndex(row, 'midi_patch'), Qt.EditRole)
         new_patch = value
         if old_patch == new_patch:
             return old_patch
