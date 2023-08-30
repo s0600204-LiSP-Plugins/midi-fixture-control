@@ -139,13 +139,9 @@ class MidiPatchModel(QAbstractTableModel):
         self._midi = get_plugin('Midi')
         self.channel_address_spaces = {}
         self.deviceid_address_spaces = {}
-        if hasattr(self._midi, "output_patches"):
-            for midi_patch_id in self._midi.output_patches():
-                self.channel_address_spaces[midi_patch_id] = MidiChannelAddressSpace()
-                self.deviceid_address_spaces[midi_patch_id] = MidiDeviceIdAddressSpace()
-        else:
-            self.channel_address_spaces["out"] = MidiChannelAddressSpace()
-            self.deviceid_address_spaces["out"] = MidiDeviceIdAddressSpace()
+        for midi_patch_id in self._midi.output_patches():
+            self.channel_address_spaces[midi_patch_id] = MidiChannelAddressSpace()
+            self.deviceid_address_spaces[midi_patch_id] = MidiDeviceIdAddressSpace()
 
         self.catalogue = Catalogue(include_unstable=True)
         self.patch_count = 0
