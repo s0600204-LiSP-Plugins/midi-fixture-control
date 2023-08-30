@@ -65,11 +65,10 @@ class FixtureCommandCue(Cue):
 class FixtureCommandCueSettings(SettingsPage):
     Name = QT_TRANSLATE_NOOP('SettingsPageName', 'Fixture Command Settings')
 
-    argument_sources = {}
-
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self.setLayout(QFormLayout())
+        self.argument_sources = {}
 
         def _build_patch_label(profile):
             addresses = []
@@ -118,15 +117,14 @@ class FixtureCommandCueSettings(SettingsPage):
             self.command_combo.addItem(details['caption'] if 'caption' in details else cmd, cmd)
         self.command_combo.currentIndexChanged.connect(self._select_command)
 
-        # Clear arg list
-        for name, widget in self.argument_sources.items():
-            if widget.isHidden():
-                # If the widget has been `.takeRow`d, running `.removeRow` throws an error.
-                self.layout().addRow('temp', widget)
-            self.layout().removeRow(widget)
+        # Hide all current sources
+        for widget in self.argument_sources.values():
+            if not widget.isHidden():
+                row = self.layout().takeRow(widget)
+                row.labelItem.widget().hide()
+                widget.hide()
 
         # Supply arg sources
-        self.argument_sources = {}
         for name, definition in fixture_profile.parameters().items():
             if name in self.argument_sources:
                 continue
