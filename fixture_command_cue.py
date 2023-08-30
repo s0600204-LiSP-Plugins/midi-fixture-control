@@ -47,18 +47,20 @@ class FixtureCommandCue(Cue):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.name = translate('CueName', self.Name)
-        self._midi_out = get_plugin('Midi').output
+        self._midi = get_plugin('Midi')
+        self._plugin = get_plugin('MidiFixtureControl')
 
     def __start__(self, _):
         if not self.fixture_command or not self.fixture_command['patch_id']:
             return False
 
-        profile = get_plugin('MidiFixtureControl').get_profile(self.fixture_command['patch_id'])
+        midi_patch = self._plugin.get_patched_output(self.fixture_command['patch_id'])
+        profile = self._plugin.get_profile(self.fixture_command['patch_id'])
         midi_messages = profile.build_command(self.fixture_command['command'],
                                               self.fixture_command['args'])
 
         for dict_message in midi_messages:
-            self._midi_out.send(midi_from_dict(dict_message))
+            self._midi.send(midi_patch, midi_from_dict(dict_message))
 
         return False
 

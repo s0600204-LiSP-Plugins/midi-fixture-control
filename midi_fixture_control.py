@@ -62,6 +62,12 @@ class MidiFixtureControl(Plugin):
     def _on_session_initialised(self):
         self._on_session_config_altered(None)
 
+    def get_patched_output(self, patch_id):
+        for patch in self.SessionConfig.get('patches'):
+            if patch["patch_id"] == patch_id:
+                return patch["midi_patch"]
+        return None
+
     def get_profile(self, patch_id=None):
         if patch_id is None:
             if self.SessionConfig['default_patch']:
