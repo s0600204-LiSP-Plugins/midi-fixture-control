@@ -37,7 +37,7 @@ from lisp.ui.settings.cue_settings import CueSettingsRegistry
 from lisp.ui.settings.pages import SettingsPage
 from lisp.ui.ui_utils import translate
 
-from .ui import Fader
+from .ui import Fader, PatchSelector
 
 class FixtureCommandCue(Cue):
     Name = QT_TRANSLATE_NOOP('CueName', 'Fixture Command Cue')
@@ -72,27 +72,9 @@ class FixtureCommandCueSettings(SettingsPage):
         self.setLayout(QFormLayout())
         self.argument_sources = {}
 
-        def _build_patch_label(profile, midi_patch):
-            addresses = []
-            if profile.channel is not None:
-                addresses.append('Channel #' + str(profile.channel + 1))
-            if profile.deviceid is not None:
-                addresses.append('ID #' + str(profile.deviceid + 1))
-            return '{manufacturer} {model} [{addresses}] (@ {midi_patch})'.format_map(
-                {
-                    'manufacturer': profile.profile.manufacturer_name,
-                    'model': profile.profile.name,
-                    'addresses': ', '.join(addresses),
-                    'midi_patch': get_plugin('Midi').output_name(midi_patch),
-                })
-
         # Dropdown of available fixture patches
-        self.patch_combo = QComboBox(self)
-        plugin = get_plugin('MidiFixtureControl')
-        for patch_definition in plugin.SessionConfig['patches']:
-            patch_id = patch_definition['patch_id']
-            midi_patch = patch_definition['midi_patch']
-            self.patch_combo.addItem(_build_patch_label(plugin.get_profile(patch_id), midi_patch), patch_id)
+        self.patch_combo = PatchSelector(self)
+        self.patch_combo.refresh()
         self.patch_combo.currentIndexChanged.connect(self._select_patch)
         self.layout().addRow('Patched Fixture:', self.patch_combo)
 
