@@ -1,4 +1,6 @@
 
+from PyQt5.QtCore import Qt
+
 from lisp.plugins.midi.widgets import MIDIPatchCombo
 from lisp.ui.qdelegates import ComboBoxDelegate
 
@@ -14,3 +16,5 @@ class MIDIPatchComboDelegate(ComboBoxDelegate):
         editor.retranslateUi()
         return editor
 
+    def setEditorData(self, comboBox, index):
+        comboBox.setCurrentIndex(comboBox.findData(index.model().data(index, Qt.EditRole)))
