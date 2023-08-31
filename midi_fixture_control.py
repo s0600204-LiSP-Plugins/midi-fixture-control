@@ -65,7 +65,7 @@ class MidiFixtureControl(Plugin):
     def get_patched_output(self, patch_id):
         for patch in self.SessionConfig.get('patches'):
             if patch["patch_id"] == patch_id:
-                return patch["midi_patch"]
+                return patch["midi_patch_id"]
         return None
 
     def get_profile(self, patch_id=None):

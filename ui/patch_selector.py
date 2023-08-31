@@ -40,7 +40,7 @@ class PatchSelector(QComboBox):
 
         midi_patches = {}
         for definition in self._plugin.SessionConfig['patches']:
-            midi_patch_id = definition['midi_patch']
+            midi_patch_id = definition['midi_patch_id']
             if midi_patch_id not in midi_patches:
                 midi_patches[midi_patch_id] = []
             midi_patches[midi_patch_id].append(definition)

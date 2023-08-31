@@ -54,13 +54,13 @@ class FixtureCommandCue(Cue):
         if not self.fixture_command or not self.fixture_command['patch_id']:
             return False
 
-        midi_patch = self._plugin.get_patched_output(self.fixture_command['patch_id'])
+        midi_patch_id = self._plugin.get_patched_output(self.fixture_command['patch_id'])
         profile = self._plugin.get_profile(self.fixture_command['patch_id'])
         midi_messages = profile.build_command(self.fixture_command['command'],
                                               self.fixture_command['args'])
 
         for dict_message in midi_messages:
-            self._midi.send(midi_patch, midi_from_dict(dict_message))
+            self._midi.send(midi_patch_id, midi_from_dict(dict_message))
 
         return False
 
