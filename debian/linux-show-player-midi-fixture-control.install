@@ -1,0 +1,4 @@
+ui usr/lib/python3/dist-packages/lisp/plugins/midi_fixture_control
+*.json usr/lib/python3/dist-packages/lisp/plugins/midi_fixture_control
+*.py usr/lib/python3/dist-packages/lisp/plugins/midi_fixture_control
+

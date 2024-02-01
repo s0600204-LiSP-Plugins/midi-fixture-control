@@ -1,0 +1,27 @@
+Source: midi-fixture-control
+Section: sound
+Priority: optional
+Maintainer: s0600204 <dev@s0600204>
+Rules-Requires-Root: no
+Build-Depends:
+ debhelper-compat (= 13)
+Standards-Version: 4.6.2
+Homepage: https://github.com/s0600204-lisp-plugins/midi-fixture-control.git
+
+Package: linux-show-player-midi-fixture-control
+Architecture: all
+Depends:
+ ${misc:Depends},
+ python3-midi-fixture-library
+Description: MIDI Fixture Control
+ This plugin adds the ability to control supported MIDI devices in an abstract
+ way from within Linux Show Player.
+ .
+ For instance, if you had an Allen & Heath GLD80 sound desk, and you wished to
+ mute Input Channel 14: instead of having to look up how to do it in the product
+ manual, this plugin allows you to select that desk, that action, and that
+ channel - and the appropriate MIDI is pieced together for you, then transmitted
+ when cued.
+ .
+ At no point does the user need to know the MIDI implementation of the device
+ they're sending messages to.
